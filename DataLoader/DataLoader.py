@@ -63,3 +63,19 @@ class QM9Dataset(Dataset):
             # Combine the atomic numbers and coordinates
             dataframe = np.hstack((atomic_numbers.reshape(-1, 1), coords))
             return dataframe
+
+def my_collate_fn(data):
+        return data
+
+# Function to create the dataset
+def DataLoad(find_edges=True, r_max=1, batch_size=1, shuffle=False):
+    # Create the dataset
+    data = QM9(root='./QM9')
+
+    # Create the dataset object
+    dataset = QM9Dataset(data, find_edges, r_max=r_max)
+
+    # Create the dataloader
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, collate_fn=my_collate_fn)
+
+    return dataloader
