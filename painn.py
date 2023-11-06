@@ -19,6 +19,12 @@ class painn(nn.Module):
             nn.Linear(128, 384),
         )
         
+        self.a = nn.Sequential(
+            nn.Linear(256, 128),
+            nn.SiLU(),
+            nn.Linear(128,384)
+        )
+        
         
 class message(nn.Module):
     def __init__(self, atomic_numbers, positional_encodings, feature_vector) -> None:
@@ -77,8 +83,20 @@ class update(nn.Module):
         
     def foward(self):
         
-        # left v-block
-        v = self.v #TODO
+        # top v-block
+        v = self.v #TODO: Need to understand the supossed linear combination
+        u = self.v #TODO: Need to understand the supossed linear combination
         
         # s-block
-        torch.stack((torch.norm(self.v), self.s))
+        s_stack = torch.stack((torch.norm(self.v), self.s))
+        split = self.a(s_stack)
+        
+        # left v-block continues
+        v = hadamard(u, split[:128])
+        
+        # right v-block continues
+        s = v #TODO: What does the scalar product need to be between?
+        s = hadamard(s, split[128:128 * 2])
+        s = torch.add(s, split[:128 * 2])
+        
+        return v, s  
