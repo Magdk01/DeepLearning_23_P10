@@ -12,6 +12,9 @@ class GCNConv(MessagePassing):
     def __init__(self, in_channels, out_channels):
         super().__init__(aggr="add")  # "Add" aggregation (Step 5).
         self.lin = Linear(in_channels, out_channels, bias=False)
+
+        self.lin_update = Linear(in_channels, out_channels, bias=False)
+
         self.bias = Parameter(torch.empty(out_channels))
 
         self.reset_parameters()
@@ -39,6 +42,7 @@ class GCNConv(MessagePassing):
 
         # Step 4-5: Start propagating messages.
         out = self.propagate(edge_index, x=x, norm=norm)
+        # out = self.update_(x, out)
 
         # Step 6: Apply a final bias vector.
         out += self.bias
@@ -51,6 +55,10 @@ class GCNConv(MessagePassing):
         # Step 4: Normalize node features.
         return norm.view(-1, 1) * x_j
 
+    def update(self, out,x):
+        # x = self.lin_update(x)
+        return out + x
+
 
 # edge_index = torch.tensor([[0, 1], [1, 0], [1, 2], [2, 1]], dtype=torch.long)
 edge_index = torch.tensor([[0, 1, 1, 2], [1, 0, 2, 1]], dtype=torch.long)
@@ -62,5 +70,5 @@ data = Data(x=x, edge_index=edge_index.t().contiguous())
 data
 
 
-conv = GCNConv(1, 32)
+conv = GCNConv(1, 3)
 print(conv(x, edge_index))
