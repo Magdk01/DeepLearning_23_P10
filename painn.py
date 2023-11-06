@@ -11,26 +11,28 @@ class painn(nn.Module):
         
         self.s = atomic_numbers
         self.r = positional_encodings
+        self.v = torch.zeros_like(self.z)
         
-
-
+        self.ø = nn.Sequential(
+            nn.Linear(128, 128),
+            nn.SiLU(),
+            nn.Linear(128, 384),
+        )
+        
+        
 class message(nn.Module):
-    def __init__(self, atomic_numbers, positional_encodings) -> None:
+    def __init__(self, atomic_numbers, positional_encodings, feature_vector) -> None:
         
         self.s = atomic_numbers
         self.r = positional_encodings
-        self.v = torch.zeros_like(self.z)
-        
-        self.silu = nn.SiLU()
+        self.v = feature_vector
     
     def forward(self):
         
         # s-block
-        s = nn.Linear(128, 128) (self.s)
-        s = self.silu(s)
-        ø = nn.Linear(128, 384) (s)
+        ø_out = self.ø(self.s)
         
-        assert len(ø) == 384
+        assert len(ø_out) == 384
         
         # left r-block
         r = self.__rbf(self.r)
@@ -39,7 +41,7 @@ class message(nn.Module):
         
         assert len(w) == 384
         
-        split = hadamard(w, ø)
+        split = hadamard(w, ø_out)
         
         out_s = torch.sum(split[128: 128 * 2], axis= 0)
         
@@ -62,3 +64,21 @@ class message(nn.Module):
     
     def __fcut(self):
         raise NotImplementedError()
+    
+    
+class update(nn.Module):
+    def __init__(self, atomic_numbers, positional_encodings, feature_vector) -> None:
+        
+        self.s = atomic_numbers
+        self.r = positional_encodings
+        self.v = feature_vector
+        
+        self.silu = nn.SiLU()
+        
+    def foward(self):
+        
+        # left v-block
+        v = self.v #TODO
+        
+        # s-block
+        torch.stack((torch.norm(self.v), self.s))
