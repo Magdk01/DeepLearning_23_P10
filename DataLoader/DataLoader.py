@@ -10,40 +10,27 @@ from torch_geometric.datasets import QM9
 from torch.utils.data import DataLoader
 warnings.filterwarnings("ignore")
 
+# Import libraries
+import os
+from torch.utils.data import Dataset
+import warnings
+import trimesh
+import glob
+import numpy as np
+import torch
+from torch_geometric.datasets import QM9
+from torch.utils.data import DataLoader
+warnings.filterwarnings("ignore")
+
 # Dataset class
 class QM9Dataset(Dataset):
     # Initialize the dataset object
-    def __init__(self, data, find_edges, r_max=1):
+    def __init__(self, data):
         self.dataset = data
-        self.find_edges = find_edges
-        self.r_max = r_max
 
     # Return the length of the dataset
     def __len__(self):
         return len(self.dataset)
-    
-    # Find neighbours
-    def find_neighbours(self, pos, r_max=1):
-        # Get the positions of the atoms
-        pos = pos.numpy()
-
-        # Initialize the list for edges
-        edge_index = []
-
-        # Loop over all atoms
-        for i, p_i in enumerate(pos):
-            # Loop over all atoms again (including the same atom)
-            for j, p_j in enumerate(pos):
-                # Don't compare the same atom
-                if i != j:
-                    # Calculate distance
-                    d = np.linalg.norm(p_i - p_j)
-
-                    # Check if distance is below r_max
-                    if d <= r_max:
-                        edge_index.append([i, j])
-
-        return edge_index
     
     # Return the item at the given index
     def __getitem__(self, index):
@@ -53,29 +40,32 @@ class QM9Dataset(Dataset):
         atomic_numbers = batch.z
         coords = batch.pos
 
-        # Find the edges
-        if self.find_edges:
-            edge_index = self.find_neighbours(coords, r_max=self.r_max)
-            dataframe = np.hstack((atomic_numbers.reshape(-1, 1), coords))
-            return dataframe, edge_index
+        # Variable to predict
+        #y = batch.x
 
-        else:
-            # Combine the atomic numbers and coordinates
-            dataframe = np.hstack((atomic_numbers.reshape(-1, 1), coords))
-            return dataframe
+        # Combine the atomic numbers, coordinates and variable to predict
+    
+        return atomic_numbers, coords, #y
 
 def my_collate_fn(data):
         return data
 
 # Function to create the dataset
-def DataLoad(find_edges=True, r_max=1, batch_size=1, shuffle=False):
+def DataLoad(batch_size=1, shuffle=False):
     # Create the dataset
     data = QM9(root='./QM9')
 
     # Create the dataset object
-    dataset = QM9Dataset(data, find_edges, r_max=r_max)
+    dataset = QM9Dataset(data)
 
-    # Create the dataloader
-    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, collate_fn=my_collate_fn)
+    # Train-test split
+    train_size = int(0.8 * len(dataset))
+    test_size = len(dataset) - train_size
 
-    return dataloader
+    train_dataset, test_dataset = torch.utils.data.random_split(dataset, [train_size, test_size])
+
+    # Create the train and test dataloaders
+    train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=shuffle, collate_fn=my_collate_fn)
+    test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=shuffle, collate_fn=my_collate_fn)
+
+    return train_dataloader, test_dataloader
