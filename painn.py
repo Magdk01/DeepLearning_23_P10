@@ -15,7 +15,7 @@ class painn(nn.Module):
         self.r_cut = r_cut
         
         self.embedding_layer = nn.Embedding(128)
-        self.message_model = message()
+        self.message_model = message(self.r_cut)
         self.update_model = update()
         
         self.output_layers = nn.Sequential(
@@ -26,7 +26,7 @@ class painn(nn.Module):
         
         def forward(self):
             self.s = self.embedding_layer(self.atomic)
-            
+
             for _ in range(3):
                 v, s = self.v.copy(), self.s.copy()
                 
@@ -92,10 +92,16 @@ class message(nn.Module):
         
         return out_v, out_s
         
-        
+    def __rbf_calc(self, r_ij, n):
+        r_norms = torch.norm(r_ij, dim=2, keepdim=True)
+        return torch.sin((n * torch.pi) / self.r_cut * r_norms) / r_norms
+
     
-    def __rbf(self):
-        raise NotImplementedError()
+    def __rbf(self, input, n):
+        n_values = torch.arange(1, n + 1).float().view(1, -1)  # Reshape n_values to (1, n)
+        expanded_tensor = input.unsqueeze(2).repeat(1, 1, n)  # Expand input tensor to (12, 1, n)
+
+        return self.__rbf_calc(expanded_tensor, n_values)
     
     def __fcut(self):
         raise NotImplementedError()
