@@ -102,11 +102,8 @@ class message(nn.Module):
     
     
 class update(nn.Module):
-    def __init__(self, atomic_numbers, positional_encodings, feature_vector) -> None:
+    def __init__(self) -> None:
         
-        self.s = atomic_numbers
-        self.r = positional_encodings
-        self.v = feature_vector
         
         self.a = nn.Sequential(
             nn.Linear(256, 128),
