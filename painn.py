@@ -7,15 +7,16 @@ def hadamard(m1, m2):
     return m1 * m2
 
 class painn(nn.Module):
-    def __init__(self, atomic_numbers, positional_encodings,r_cut) -> None:
+    def __init__(self, atomic_numbers, positional_encodings,r_cut=2,n=20) -> None:
         
         self.atomic = atomic_numbers
         self.r = positional_encodings
         self.v = torch.zeros_like(self.z)
         self.r_cut = r_cut
+        self.n = n
         
         self.embedding_layer = nn.Embedding(128)
-        self.message_model = message(self.r_cut)
+        self.message_model = message(self.r_cut,self.n)
         self.update_model = update()
         
         self.output_layers = nn.Sequential(
@@ -49,7 +50,7 @@ class painn(nn.Module):
                 
             
 class message(nn.Module):
-    def __init__(self,r_cut) -> None:
+    def __init__(self,r_cut,n) -> None:
         
         self.ø = nn.Sequential(
             nn.Linear(128, 128),
@@ -57,6 +58,7 @@ class message(nn.Module):
             nn.Linear(128, 384),
         )
         self.r_cut = r_cut
+        self.n = n
 
     def forward(self):
         
@@ -71,7 +73,7 @@ class message(nn.Module):
         
         # left r-block
         r = self.__rbf(r)
-        r = nn.Linear(20, 384) (r)
+        r = nn.Linear(20, 384)(r)
         w = self.__fcut(r)
         
         assert len(w) == 384
@@ -97,14 +99,18 @@ class message(nn.Module):
         return torch.sin((n * torch.pi) / self.r_cut * r_norms) / r_norms
 
     
-    def __rbf(self, input, n):
-        n_values = torch.arange(1, n + 1).float().view(1, -1)  # Reshape n_values to (1, n)
-        expanded_tensor = input.unsqueeze(2).repeat(1, 1, n)  # Expand input tensor to (12, 1, n)
+    def __rbf(self, input):
+        n_values = torch.arange(1, self.n + 1).float().view(1, -1)  # Reshape n_values to (1, n)
+        expanded_tensor = input.unsqueeze(2).repeat(1, self.n)  # Expand input tensor to (12, 1, n)
 
         return self.__rbf_calc(expanded_tensor, n_values)
-    
-    def __fcut(self):
-        raise NotImplementedError()
+
+    def __fcut(tensor, R_c):
+        # Applying the cosine cutoff function element-wise
+        cos_cutoff = torch.where(tensor <= R_c,
+                                0.5 * (torch.cos(torch.pi * tensor / R_c) + 1),
+                                torch.zeros_like(tensor))
+        return cos_cutoff
     
     
 class update(nn.Module):
