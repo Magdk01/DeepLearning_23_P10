@@ -7,12 +7,14 @@ def hadamard(m1, m2):
     return m1 * m2
 
 class painn(nn.Module):
-    def __init__(self, atomic_numbers, positional_encodings) -> None:
+    def __init__(self, atomic_numbers, positional_encodings,r_cut) -> None:
         
-        self.s = atomic_numbers
+        self.atomic = atomic_numbers
         self.r = positional_encodings
         self.v = torch.zeros_like(self.z)
+        self.r_cut = r_cut
         
+        self.embedding_layer = nn.Embedding(128)
         self.message_model = message()
         self.update_model = update()
         
@@ -23,6 +25,8 @@ class painn(nn.Module):
         )
         
         def forward(self):
+            self.s = self.embedding_layer(self.atomic)
+            
             for _ in range(3):
                 v, s = self.v.copy(), self.s.copy()
                 
@@ -45,14 +49,15 @@ class painn(nn.Module):
                 
             
 class message(nn.Module):
-    def __init__(self) -> None:
+    def __init__(self,r_cut) -> None:
         
         self.ø = nn.Sequential(
             nn.Linear(128, 128),
             nn.SiLU(),
             nn.Linear(128, 384),
         )
-    
+        self.r_cut = r_cut
+
     def forward(self):
         
         s = self.s.copy()
