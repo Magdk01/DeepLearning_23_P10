@@ -24,7 +24,7 @@ class QM9Dataset(Dataset):
         coords = batch.pos
 
         # q = atomic_numbers copied 3 times 
-        q = [num for num in atomic_numbers for i in range(3)]
+        q = [num.item() for num in atomic_numbers for _ in range(3)]
 
         # R_ij = 3x(len(atomic_numbers) * 3))
         r_ij = torch.zeros((3, len(atomic_numbers) * 3))
@@ -38,7 +38,7 @@ class QM9Dataset(Dataset):
         y = batch.y[0][self.y_index]
 
         # Combine the atomic numbers, coordinates and variable to predict
-        return atomic_numbers, coords, y
+        return q, r_ij, y
 
 def my_collate_fn(data):
         return data
