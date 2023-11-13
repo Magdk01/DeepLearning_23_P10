@@ -140,7 +140,7 @@ class update(nn.Module):
         out_v = hadamard(u, split[:128])
         
         # right v-block continues
-        s = v #TODO: What does the scalar product need to be between?
+        s = torch.tensordot(v, u, dims=len(v))
         s = hadamard(s, split[128:128 * 2])
         out_s = torch.add(s, split[:128 * 2])
         
