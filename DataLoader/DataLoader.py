@@ -1,26 +1,8 @@
 # Import libraries
-import os
-from torch.utils.data import Dataset
-import warnings
-import trimesh
-import glob
-import numpy as np
 import torch
+from torch.utils.data import Dataset
 from torch_geometric.datasets import QM9
 from torch.utils.data import DataLoader
-warnings.filterwarnings("ignore")
-
-# Import libraries
-import os
-from torch.utils.data import Dataset
-import warnings
-import trimesh
-import glob
-import numpy as np
-import torch
-from torch_geometric.datasets import QM9
-from torch.utils.data import DataLoader
-warnings.filterwarnings("ignore")
 
 # Dataset class
 class QM9Dataset(Dataset):
@@ -41,17 +23,16 @@ class QM9Dataset(Dataset):
         coords = batch.pos
 
         # Variable to predict
-        #y = batch.x
+        y = batch.y
 
         # Combine the atomic numbers, coordinates and variable to predict
-    
-        return atomic_numbers, coords, #y
+        return atomic_numbers, coords, y
 
 def my_collate_fn(data):
         return data
 
 # Function to create the dataset
-def DataLoad(batch_size=1, shuffle=False):
+def DataLoad(batch_size=1, shuffle=False, split=0.8):
     # Create the dataset
     data = QM9(root='./QM9')
 
@@ -59,7 +40,7 @@ def DataLoad(batch_size=1, shuffle=False):
     dataset = QM9Dataset(data)
 
     # Train-test split
-    train_size = int(0.8 * len(dataset))
+    train_size = int(split * len(dataset))
     test_size = len(dataset) - train_size
 
     train_dataset, test_dataset = torch.utils.data.random_split(dataset, [train_size, test_size])
