@@ -114,6 +114,14 @@ class update(nn.Module):
             nn.Linear(128,384)
         )
         
+        self.V = nn.Sequential(
+            nn.Linear(128, 128, bias=True)
+        )
+        
+        self.U = nn.Sequential(
+            nn.Linear(128, 128, bias=True)
+        )
+        
     def forward(self):
         
         s = self.s.copy()
@@ -121,8 +129,8 @@ class update(nn.Module):
         v = self.v.copy()
         
         # top v-block
-        v = v #TODO: Need to understand the supossed linear combination
-        u = v #TODO: Need to understand the supossed linear combination
+        v = self.V(v)
+        u = self.U(v)
         
         # s-block
         s_stack = torch.stack((torch.norm(v), s))
