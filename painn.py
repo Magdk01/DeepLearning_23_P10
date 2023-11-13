@@ -108,11 +108,8 @@ class message(nn.Module):
     
     
 class update(nn.Module):
-    def __init__(self, atomic_numbers, positional_encodings, feature_vector) -> None:
+    def __init__(self) -> None:
         
-        self.s = atomic_numbers
-        self.r = positional_encodings
-        self.v = feature_vector
         
         self.a = nn.Sequential(
             nn.Linear(256, 128),
@@ -120,15 +117,23 @@ class update(nn.Module):
             nn.Linear(128,384)
         )
         
-    def foward(self):
+        self.V = nn.Sequential(
+            nn.Linear(128, 128, bias=True)
+        )
+        
+        self.U = nn.Sequential(
+            nn.Linear(128, 128, bias=True)
+        )
+        
+    def forward(self):
         
         s = self.s.copy()
         r = self.r.copy()
         v = self.v.copy()
         
         # top v-block
-        v = v #TODO: Need to understand the supossed linear combination
-        u = v #TODO: Need to understand the supossed linear combination
+        v = self.V(v)
+        u = self.U(v)
         
         # s-block
         s_stack = torch.stack((torch.norm(v), s))
@@ -138,7 +143,7 @@ class update(nn.Module):
         out_v = hadamard(u, split[:128])
         
         # right v-block continues
-        s = v #TODO: What does the scalar product need to be between?
+        s = torch.tensordot(v, u, dims=len(v))
         s = hadamard(s, split[128:128 * 2])
         out_s = torch.add(s, split[:128 * 2])
         
