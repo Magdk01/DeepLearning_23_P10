@@ -114,7 +114,7 @@ class update(nn.Module):
             nn.Linear(128,384)
         )
         
-    def foward(self):
+    def forward(self):
         
         s = self.s.copy()
         r = self.r.copy()
