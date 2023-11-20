@@ -83,7 +83,8 @@ class message(nn.Module):
 
         # right r-block
         org_r = org_r / torch.norm(org_r)
-        org_r = torch.norm(org_r, dim=1).unsqueeze(1).unsqueeze(2).repeat(1, 1, 128)
+        # org_r = torch.norm(org_r, dim=1).unsqueeze(1).unsqueeze(2).repeat(1, 1, 128)
+        org_r = org_r.unsqueeze(2).repeat(1,1,128)
         org_r = hadamard(split_tensor[2], org_r)  # To fix di
 
         # v-block
@@ -141,7 +142,9 @@ class update(nn.Module):
         out_v = hadamard(u, split_tensor[0])
 
         # right v-block continues
-        s = torch.tensordot(v, u, dims=len(v))
+        # s = torch.tensordot(v, u, dims=len(v))
+        s = torch.sum((u * v), dim=1).unsqueeze(1)
+
         s = hadamard(s, split_tensor[1])
         out_s = torch.add(s, split_tensor[2])
 
