@@ -27,7 +27,7 @@ class painn(nn.Module):
 
     def forward(self):
         self.s = self.embedding_layer(self.atomic)
-        self.v = torch.zeros_like(self.s)
+        self.v = torch.zeros_like(self.r)
 
         for _ in range(3):
             v, s = self.v.detach().clone(), self.s.detach().clone()
@@ -75,17 +75,18 @@ class message(nn.Module):
         assert w.size(2) == 384
 
         split = hadamard(w, ø_out)
-        split_tensor = torch.split(split,128,dim=2)
+        split_tensor = torch.split(split, 128, dim=2)
 
         out_s = torch.sum(split_tensor[1], axis=0)
 
         # right r-block
         org_r = org_r / torch.norm(org_r)
-        org_r = hadamard(split_tensor[2].repeat(1,1,3), org_r) # To fix di
+        org_r = torch.norm(org_r, dim=1).unsqueeze(1).unsqueeze(2).repeat(1, 1, 128)
+        org_r = hadamard(split_tensor[2], org_r)  # To fix di
 
         # v-block
         v = hadamard(split_tensor[0], v)
-        v = torch.add(r, v)
+        v = torch.add(org_r, v)
 
         out_v = torch.sum(v, axis=0)
 
@@ -96,8 +97,9 @@ class message(nn.Module):
         r_norms = torch.norm(input, dim=1, keepdim=True)  # Shape: (12,)
 
         # Broadcasting r_norms to (12, n) and n_values to (12, n)
-        r_norms = r_norms.unsqueeze(2).expand(-1,-1, n)
-        n_values = n_values.unsqueeze(0).expand(12,1, -1)
+        r_norms = r_norms.unsqueeze(2).expand(-1, -1, n)
+
+        n_values = n_values.unsqueeze(0).expand(12, 1, -1)
 
         res = torch.sin((n_values * torch.pi) / self.r_cut * r_norms) / r_norms
 
@@ -126,6 +128,7 @@ class update(nn.Module):
     def forward(self, s, v):
         # top v-block
         v = self.V(v)
+
         u = self.U(v)
 
         # s-block
