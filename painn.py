@@ -182,8 +182,9 @@ def positional_adjacency(molecule_pos: list, r: int) -> list:
 def r_ij_calc(adj_list, positions):
     r_ij = []
     for idx, i in enumerate(adj_list[0]):
-        r_ij.append(positions[adj_list[0][idx]] - positions[adj_list[1][idx]])
-    return np.array(r_ij)
+        pos = positions[adj_list[0][idx]] - positions[adj_list[1][idx]]
+        r_ij.append(pos)
+    return np.array([r_ij[0]])
 
 
 # def sum_over_j(v,idx_j):
