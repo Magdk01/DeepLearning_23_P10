@@ -156,6 +156,6 @@ if __name__ == "__main__":
     n = 12
     atomic_number = torch.randint(low=0, high=8, size=(n, 1))
     pos = torch.randn(n, 3)
-    model = painn(atomic_number, pos)
+    model = painn()
 
-    print(model())
+    print(model(atomic_number, pos))
