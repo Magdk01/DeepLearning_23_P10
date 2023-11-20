@@ -27,7 +27,8 @@ class painn(nn.Module):
 
     def forward(self):
         self.s = self.embedding_layer(self.atomic)
-        self.v = torch.zeros_like(self.r)
+        self.v = torch.zeros((self.r.shape[0], 3, 128))
+        self.v = torch.broadcast_to(self.v, (self.v.shape[0], self.v.shape[1], 128))
 
         for _ in range(3):
             v, s = self.v.detach().clone(), self.s.detach().clone()
