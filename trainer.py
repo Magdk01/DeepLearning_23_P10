@@ -14,7 +14,7 @@ config = {
     "batch_size": 1,
 }
 
-enable_wandb = False
+enable_wandb = True
 if enable_wandb:
     wandb.login()
     wandb.init(
@@ -69,7 +69,7 @@ def run_epoch(loader, model, loss_fn, optimizer, val_loader=None):
                 if enable_wandb:
                     wandb.log({"Train Loss": last_loss})
 
-            if i % 1000 == 0 and val_loader:
+            if i + 1 % 1000 == 0 and val_loader:
                 # print(i)
                 avg_loss_val_list = []
                 val_load = val_loader.__iter__()

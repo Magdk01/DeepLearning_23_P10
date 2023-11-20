@@ -16,33 +16,51 @@ class painn(nn.Module):
         self.r_cut = r_cut
         self.n = n
         self.embedding_layer = nn.Sequential(nn.Embedding(10, 128))
-        self.message_model = message(self.r_cut, self.n)
-        self.update_model = update()
 
+        # Message layers
+        self.shared_ø_layer = nn.Sequential(
+            nn.Linear(128, 128),
+            nn.SiLU(),
+            nn.Linear(128, 384),
+        )
+        message_model = message(self.r_cut, self.n, self.shared_ø_layer)
+        self.message_models = [message_model] * 3
+
+        # Update layers
+        self.shared_a = nn.Sequential(
+            nn.Linear(256, 128), nn.SiLU(), nn.Linear(128, 384)
+        )
+        self.shared_V = nn.Sequential(nn.Linear(128, 128, bias=True))
+        self.shared_U = nn.Sequential(nn.Linear(128, 128, bias=True))
+        update_model = update(self.shared_a, self.shared_V, self.shared_U)
+        self.update_models = [update_model] * 3
+
+        # Output layers
         self.output_layers = nn.Sequential(
             nn.Linear(128, 128), nn.SiLU(), nn.Linear(128, 128)
         )
 
     def forward(self, atomic_numbers, positional_encodings):
+        # Init for batch
         self.positions = torch.tensor(positional_encodings)
-
         adj_list = positional_adjacency(self.positions, self.r_cut)
         self.idx_i = adj_list[0]
         self.idx_j = adj_list[1]
         self.atomic = torch.tensor(atomic_numbers)
-
         self.r = torch.tensor(
             r_ij_calc(adj_list, positional_encodings), dtype=torch.float32
         )
+
+        # Embedding of atoms
         self.s = self.embedding_layer(self.atomic).unsqueeze(1)
 
         # Then scaling to match all connections in molecule
         self.v = torch.zeros((self.s.shape[0], 3, 128))
 
-        for _ in range(3):
+        for idx in range(3):
             v, s = self.v.detach().clone(), self.s.detach().clone()
 
-            self.v, self.s = self.message_model(
+            self.v, self.s = self.message_models[idx](
                 self.s[self.idx_j], self.r, v[self.idx_j], self.idx_i
             )
 
@@ -51,7 +69,7 @@ class painn(nn.Module):
 
             v, s = self.v.detach().clone(), self.s.detach().clone()
 
-            self.v, self.s = self.update_model(s, v)
+            self.v, self.s = self.update_models[idx](s, v)
 
             self.v = self.v + v
             self.s = self.s + s
@@ -63,15 +81,12 @@ class painn(nn.Module):
 
 
 class message(nn.Module):
-    def __init__(self, r_cut, n) -> None:
+    def __init__(self, r_cut, n, ø_layer) -> None:
         super(message, self).__init__()
-        self.ø = nn.Sequential(
-            nn.Linear(128, 128),
-            nn.SiLU(),
-            nn.Linear(128, 384),
-        )
+        self.ø = ø_layer
         self.r_cut = r_cut
         self.n = n
+        self.internal_w_layer = nn.Sequential(nn.Linear(20, 384, bias=True))
 
     def forward(self, s, r, v, idx_i):
         # s-block
@@ -82,7 +97,7 @@ class message(nn.Module):
         # left r-block
         r = self.__rbf(r, self.n)
         r = self.__fcut(r, self.r_cut)
-        w = nn.Linear(20, 384)(r)
+        w = self.internal_w_layer(r)
         # w = self.__fcut(r, self.r_cut)
 
         assert w.size(2) == 384
@@ -135,14 +150,11 @@ class message(nn.Module):
 
 
 class update(nn.Module):
-    def __init__(self) -> None:
+    def __init__(self, a, V, U) -> None:
         super(update, self).__init__()
-
-        self.a = nn.Sequential(nn.Linear(256, 128), nn.SiLU(), nn.Linear(128, 384))
-
-        self.V = nn.Sequential(nn.Linear(128, 128, bias=True))
-
-        self.U = nn.Sequential(nn.Linear(128, 128, bias=True))
+        self.a = a
+        self.V = V
+        self.U = U
 
     def forward(self, s, v):
         # top v-block
@@ -208,5 +220,7 @@ if __name__ == "__main__":
     # atomic_number = torch.randint(low=0, high=8, size=(n, 1))
     # pos = torch.randn(n, 3)
     model = painn()
+    for name, param in model.named_parameters():
+        print(name, param.requires_grad)
 
     print(model(numbers, positions))
