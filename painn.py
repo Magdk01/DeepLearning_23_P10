@@ -15,7 +15,7 @@ class painn(nn.Module):
         self.device = "cuda:0"
         self.r_cut = r_cut
         self.n = n
-        self.embedding_layer = nn.Sequential(nn.Embedding(9, 128))
+        self.embedding_layer = nn.Sequential(nn.Embedding(10, 128))
         self.message_model = message(self.r_cut, self.n)
         self.update_model = update()
 
@@ -43,7 +43,7 @@ class painn(nn.Module):
             v, s = self.v.detach().clone(), self.s.detach().clone()
 
             self.v, self.s = self.message_model(
-                self.s[self.idx_j], self.r, v[self.idx_j],self.idx_i
+                self.s[self.idx_j], self.r, v[self.idx_j], self.idx_i
             )
 
             self.v = self.v + v
@@ -118,7 +118,7 @@ class message(nn.Module):
         # Broadcasting r_norms to (12, n) and n_values to (12, n)
         r_norms = r_norms.unsqueeze(2).expand(-1, -1, n)
 
-        n_values = n_values.unsqueeze(0).expand(12, 1, -1)
+        n_values = n_values.unsqueeze(0).expand(r_norms.shape[0], 1, -1)
 
         res = torch.sin((n_values * torch.pi) / self.r_cut * r_norms) / r_norms
 
