@@ -18,7 +18,7 @@ def run_epoch(loader, model, loss_fn, optimizer):
             optimizer.zero_grad()
 
             # Make predictions for this batch
-            outputs = model(atomic_numbers.unsqueeze(1), coords)
+            outputs = model(atomic_numbers, coords)
             assert not np.isnan(outputs.item()) 
 
             # Compute the loss and its gradients
