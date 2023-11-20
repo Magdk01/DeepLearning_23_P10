@@ -10,42 +10,40 @@ def hadamard(m1, m2):
 
 
 class painn(nn.Module):
-    def __init__(self, atomic_numbers, positional_encodings, r_cut=2, n=20) -> None:
+    def __init__(self, r_cut=2, n=20) -> None:
         super(painn, self).__init__()
         self.device = "cuda:0"
-        self.positions = torch.tensor(positional_encodings)
-        # self.r = positional_encodings
-        # self.v = torch.zeros_like(self.atomic)
         self.r_cut = r_cut
         self.n = n
-        adj_list = positional_adjacency(self.positions, r_cut)
-        self.idx_i = adj_list[0]
-        self.idx_j = adj_list[1]
-        self.r = torch.tensor(
-            r_ij_calc(adj_list, positional_encodings), dtype=torch.float32
-        )
-
-        self.atomic = torch.tensor(atomic_numbers)
-
         self.embedding_layer = nn.Sequential(nn.Embedding(9, 128))
-        self.message_model = message(self.r_cut, self.n, self.idx_i)
+        self.message_model = message(self.r_cut, self.n)
         self.update_model = update()
 
         self.output_layers = nn.Sequential(
             nn.Linear(128, 128), nn.SiLU(), nn.Linear(128, 128)
         )
 
-    def forward(self):
+    def forward(self, atomic_numbers, positional_encodings):
+        self.positions = torch.tensor(positional_encodings)
+
+        adj_list = positional_adjacency(self.positions, self.r_cut)
+        self.idx_i = adj_list[0]
+        self.idx_j = adj_list[1]
+        self.atomic = torch.tensor(atomic_numbers)
+
+        self.r = torch.tensor(
+            r_ij_calc(adj_list, positional_encodings), dtype=torch.float32
+        )
         self.s = self.embedding_layer(self.atomic).unsqueeze(1)
+
         # Then scaling to match all connections in molecule
         self.v = torch.zeros((self.s.shape[0], 3, 128))
-        # self.v = torch.broadcast_to(self.v, (self.v.shape[0], self.v.shape[1], 128))
 
         for _ in range(3):
             v, s = self.v.detach().clone(), self.s.detach().clone()
 
             self.v, self.s = self.message_model(
-                self.s[self.idx_j], self.r, v[self.idx_j]
+                self.s[self.idx_j], self.r, v[self.idx_j],self.idx_i
             )
 
             self.v = self.v + v
@@ -65,7 +63,7 @@ class painn(nn.Module):
 
 
 class message(nn.Module):
-    def __init__(self, r_cut, n, idx_i) -> None:
+    def __init__(self, r_cut, n) -> None:
         super(message, self).__init__()
         self.ø = nn.Sequential(
             nn.Linear(128, 128),
@@ -74,9 +72,8 @@ class message(nn.Module):
         )
         self.r_cut = r_cut
         self.n = n
-        self.idx_i = idx_i
 
-    def forward(self, s, r, v):
+    def forward(self, s, r, v, idx_i):
         # s-block
         ø_out = self.ø(s)
         org_r = r.detach().clone()
@@ -94,8 +91,8 @@ class message(nn.Module):
         split_tensor = torch.split(split, 128, dim=2)
 
         # out_s = torch.sum(split_tensor[1], axis=0)
-        out_s = torch.zeros(len(set(self.idx_i)), 1, 128)
-        for idx, i in enumerate(self.idx_i):
+        out_s = torch.zeros(len(set(idx_i)), 1, 128)
+        for idx, i in enumerate(idx_i):
             out_s[i] += split_tensor[1][idx]
 
         # right r-block
@@ -107,8 +104,8 @@ class message(nn.Module):
         # v-block
         v = hadamard(split_tensor[0], v)
         v = torch.add(org_r, v)
-        out_v = torch.zeros(len(set(self.idx_i)), 3, 128)
-        for idx, i in enumerate(self.idx_i):
+        out_v = torch.zeros(len(set(idx_i)), 3, 128)
+        for idx, i in enumerate(idx_i):
             out_v[i] += v[idx]
         # out_v = torch.sum(v, axis=0)
 
@@ -209,6 +206,6 @@ if __name__ == "__main__":
 
     # atomic_number = torch.randint(low=0, high=8, size=(n, 1))
     # pos = torch.randn(n, 3)
-    model = painn(numbers, positions)
+    model = painn()
 
-    print(model())
+    print(model(numbers, positions))
