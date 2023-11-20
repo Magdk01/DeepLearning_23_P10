@@ -4,7 +4,7 @@ import copy
 
 
 def hadamard(m1, m2):
-    assert m1.shape == m2.shape
+    # assert m1.shape == m2.shape
     return m1 * m2
 
 
@@ -70,8 +70,9 @@ class message(nn.Module):
 
         # left r-block
         r = self.__rbf(r, self.n)
-        r = nn.Linear(20, 384)(r)
-        w = self.__fcut(r, self.r_cut)
+        r = self.__fcut(r, self.r_cut)
+        w = nn.Linear(20, 384)(r)
+        # w = self.__fcut(r, self.r_cut)
 
         assert w.size(2) == 384
 
@@ -133,16 +134,16 @@ class update(nn.Module):
         u = self.U(v)
 
         # s-block
-        s_stack = torch.stack((torch.norm(v), s))
+        s_stack = torch.cat((torch.norm(v, dim=1, keepdim=True), s), axis=2)
         split = self.a(s_stack)
-
+        split_tensor = torch.split(split, 128, dim=2)
         # left v-block continues
-        out_v = hadamard(u, split[:128])
+        out_v = hadamard(u, split_tensor[0])
 
         # right v-block continues
         s = torch.tensordot(v, u, dims=len(v))
-        s = hadamard(s, split[128 : 128 * 2])
-        out_s = torch.add(s, split[: 128 * 2])
+        s = hadamard(s, split_tensor[1])
+        out_s = torch.add(s, split_tensor[2])
 
         return out_v, out_s
 
