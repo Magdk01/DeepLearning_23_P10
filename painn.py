@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import copy
+import numpy as np
 
 
 def hadamard(m1, m2):
@@ -11,14 +12,23 @@ def hadamard(m1, m2):
 class painn(nn.Module):
     def __init__(self, atomic_numbers, positional_encodings, r_cut=2, n=20) -> None:
         super(painn, self).__init__()
-        self.atomic = atomic_numbers
-        self.r = positional_encodings
+        self.device = "cuda:0"
+        self.positions = torch.tensor(positional_encodings)
+        # self.r = positional_encodings
         # self.v = torch.zeros_like(self.atomic)
         self.r_cut = r_cut
         self.n = n
+        adj_list = positional_adjacency(self.positions, r_cut)
+        self.idx_i = adj_list[0]
+        self.idx_j = adj_list[1]
+        self.r = torch.tensor(
+            r_ij_calc(adj_list, positional_encodings), dtype=torch.float32
+        )
+
+        self.atomic = torch.tensor(atomic_numbers)
 
         self.embedding_layer = nn.Sequential(nn.Embedding(9, 128))
-        self.message_model = message(self.r_cut, self.n)
+        self.message_model = message(self.r_cut, self.n, self.idx_i)
         self.update_model = update()
 
         self.output_layers = nn.Sequential(
@@ -26,24 +36,27 @@ class painn(nn.Module):
         )
 
     def forward(self):
-        self.s = self.embedding_layer(self.atomic)
-        self.v = torch.zeros((self.r.shape[0], 3, 128))
-        self.v = torch.broadcast_to(self.v, (self.v.shape[0], self.v.shape[1], 128))
+        self.s = self.embedding_layer(self.atomic).unsqueeze(1)
+        # Then scaling to match all connections in molecule
+        self.v = torch.zeros((self.s.shape[0], 3, 128))
+        # self.v = torch.broadcast_to(self.v, (self.v.shape[0], self.v.shape[1], 128))
 
         for _ in range(3):
             v, s = self.v.detach().clone(), self.s.detach().clone()
 
-            self.v, self.s = self.message_model(s, self.r, v)
+            self.v, self.s = self.message_model(
+                self.s[self.idx_j], self.r, v[self.idx_j]
+            )
 
-            self.v = torch.add(self.v, v)
-            self.s = torch.add(self.s, s)
+            self.v = self.v + v
+            self.s = self.s + s
 
             v, s = self.v.detach().clone(), self.s.detach().clone()
 
             self.v, self.s = self.update_model(s, v)
 
-            self.v = torch.add(self.v, v)
-            self.s = torch.add(self.s, s)
+            self.v = self.v + v
+            self.s = self.s + s
 
         out = self.output_layers(self.s)
         out = torch.sum(out)
@@ -52,7 +65,7 @@ class painn(nn.Module):
 
 
 class message(nn.Module):
-    def __init__(self, r_cut, n) -> None:
+    def __init__(self, r_cut, n, idx_i) -> None:
         super(message, self).__init__()
         self.ø = nn.Sequential(
             nn.Linear(128, 128),
@@ -61,6 +74,7 @@ class message(nn.Module):
         )
         self.r_cut = r_cut
         self.n = n
+        self.idx_i = idx_i
 
     def forward(self, s, r, v):
         # s-block
@@ -79,19 +93,24 @@ class message(nn.Module):
         split = hadamard(w, ø_out)
         split_tensor = torch.split(split, 128, dim=2)
 
-        out_s = torch.sum(split_tensor[1], axis=0)
+        # out_s = torch.sum(split_tensor[1], axis=0)
+        out_s = torch.zeros(len(set(self.idx_i)), 1, 128)
+        for idx, i in enumerate(self.idx_i):
+            out_s[i] += split_tensor[1][idx]
 
         # right r-block
         org_r = org_r / torch.norm(org_r)
         # org_r = torch.norm(org_r, dim=1).unsqueeze(1).unsqueeze(2).repeat(1, 1, 128)
-        org_r = org_r.unsqueeze(2).repeat(1,1,128)
+        org_r = org_r.unsqueeze(2).repeat(1, 1, 128)
         org_r = hadamard(split_tensor[2], org_r)  # To fix di
 
         # v-block
         v = hadamard(split_tensor[0], v)
         v = torch.add(org_r, v)
-
-        out_v = torch.sum(v, axis=0)
+        out_v = torch.zeros(len(set(self.idx_i)), 3, 128)
+        for idx, i in enumerate(self.idx_i):
+            out_v[i] += v[idx]
+        # out_v = torch.sum(v, axis=0)
 
         return out_v, out_s
 
@@ -151,11 +170,45 @@ class update(nn.Module):
         return out_v, out_s
 
 
+def positional_adjacency(molecule_pos: list, r: int) -> list:
+    adj_list = [[], []]
+
+    for i, cur_atom in enumerate(molecule_pos):
+        for j, adj_atom in enumerate(molecule_pos):
+            if not i == j and np.linalg.norm(cur_atom - adj_atom) <= r:
+                adj_list[0].append(i)
+                adj_list[1].append(j)
+
+    return adj_list
+
+
+def r_ij_calc(adj_list, positions):
+    r_ij = []
+    for idx, i in enumerate(adj_list[0]):
+        r_ij.append(positions[adj_list[0][idx]] - positions[adj_list[1][idx]])
+    return np.array(r_ij)
+
+
+# def sum_over_j(v,idx_j):
+
+
 if __name__ == "__main__":
     print("hej")
+
+    numbers = np.array([6, 1, 1, 1])
+    positions = np.array(
+        [
+            [-0.0126981359, 1.0858041578, 0.0080009958],
+            [0.002150416, -0.0060313176, 0.0019761204],
+            [1.0117308433, 1.4637511618, 0.0002765748],
+            [-0.540815069, 1.4475266138, -0.8766437152],
+        ]
+    )
+
     n = 12
-    atomic_number = torch.randint(low=0, high=8, size=(n, 1))
-    pos = torch.randn(n, 3)
-    model = painn(atomic_number, pos)
+
+    # atomic_number = torch.randint(low=0, high=8, size=(n, 1))
+    # pos = torch.randn(n, 3)
+    model = painn(numbers, positions)
 
     print(model())
