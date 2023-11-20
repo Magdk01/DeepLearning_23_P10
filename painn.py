@@ -9,10 +9,8 @@ def hadamard(m1, m2):
 
 
 class painn(nn.Module):
-    def __init__(self, atomic_numbers, positional_encodings, r_cut=2, n=20) -> None:
+    def __init__(self, r_cut=2, n=20) -> None:
         super(painn, self).__init__()
-        self.atomic = atomic_numbers
-        self.r = positional_encodings
         # self.v = torch.zeros_like(self.atomic)
         self.r_cut = r_cut
         self.n = n
@@ -25,7 +23,9 @@ class painn(nn.Module):
             nn.Linear(128, 128), nn.SiLU(), nn.Linear(128, 128)
         )
 
-    def forward(self):
+    def forward(self, atomic_numbers, positional_encodings):
+        self.atomic = atomic_numbers
+        self.r = positional_encodings
         self.s = self.embedding_layer(self.atomic)
         self.v = torch.zeros((self.r.shape[0], 3, 128))
         self.v = torch.broadcast_to(self.v, (self.v.shape[0], self.v.shape[1], 128))
