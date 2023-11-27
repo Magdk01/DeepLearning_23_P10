@@ -25,7 +25,7 @@ if enable_wandb:
     )
 
 
-def run_epoch(loader, model, loss_fn, optimizer, val_loader=None):
+def run_epoch(loader, model, loss_fn, optimizer, batch_indexies, val_loader=None):
     def extract_and_calc_loss(x):
         atomic_numbers, coords, y = x
         atomic_numbers = np.array(atomic_numbers)
@@ -33,60 +33,50 @@ def run_epoch(loader, model, loss_fn, optimizer, val_loader=None):
         y = y[0][0]
 
         # Make predictions for this batch
-        outputs = model(atomic_numbers, coords)
-        assert not np.isnan(outputs.item())
+        outputs = model(atomic_numbers, coords, batch_indexies)
+        # assert not np.isnan(outputs.item())
 
         # Compute the loss and its gradients
-        # loss = loss_fn(float(outputs), float(y))
+        loss = loss_fn(outputs, y)
         # Squared error as loss function
-        loss = (outputs - y) ** 2
+        # loss = (outputs - y) ** 2
         return loss
 
-    running_loss = 0.0
-    last_loss = 0.0
+    for i, (batch, batch_indexies) in enumerate(loader):
+        concatenated_list = [torch.cat(elements) for elements in zip(*batch)]
+        # for j, x in enumerate(batch):
+        # Zero your gradients for every batch!
+        optimizer.zero_grad()
+        loss = extract_and_calc_loss(concatenated_list)
 
-    for i, batch in enumerate(loader):
-        for j, x in enumerate(batch):
-            # Zero your gradients for every batch!
-            optimizer.zero_grad()
-            loss = extract_and_calc_loss(x)
+        loss.backward()
 
-            loss.backward()
+        # Adjust learning weights
+        optimizer.step()
 
-            # Adjust learning weights
-            optimizer.step()
+        if enable_wandb:
+            wandb.log({"Train loss": loss})
 
-            running_loss += loss.item()
+        if i + 1 % 1000 == 0 and val_loader:
+            # print(i)
+            avg_loss_val_list = []
+            val_load = val_loader.__iter__()
+            for _ in range(100):
+                avg_loss_val_list.append(extract_and_calc_loss(next(val_load)[0]))
 
-            if j == len(batch) - 1:
-                last_loss = running_loss / len(batch)  # loss per batch
-                # print(
-                #     "batch {} loss: {} n atoms {}".format(
-                #         i + 1, last_loss, len(atomic_numbers)
-                #     )
-                # )
-                running_loss = 0.0
-                if enable_wandb:
-                    wandb.log({"Train Loss": last_loss})
+            avg_loss_val_list = torch.tensor(avg_loss_val_list)
+            print(f"Mean Validation loss: {(alvl:=torch.mean(avg_loss_val_list))}")
 
-            if i + 1 % 1000 == 0 and val_loader:
-                # print(i)
-                avg_loss_val_list = []
-                val_load = val_loader.__iter__()
-                for _ in range(100):
-                    avg_loss_val_list.append(extract_and_calc_loss(next(val_load)[0]))
-                avg_loss_val_list = torch.tensor(avg_loss_val_list)
-                print(f"Mean Validation loss: {(alvl:=torch.mean(avg_loss_val_list))}")
-                if enable_wandb:
-                    wandb.log({"Mean Validation loss": alvl, "i-th_timestep": i})
+            if enable_wandb:
+                wandb.log({"Mean Validation loss": alvl, "i-th_timestep": i})
 
-    return last_loss
+    return True
 
 
 def main():
-    train_loader, test_loader, val_loader = DataLoad()
+    train_loader, test_loader, val_loader = DataLoad(batch_size=4)
     model = painn()
-    loss = torch.nn.MSELoss(reduction="none")
+    loss = torch.nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=config["learning_rate"])
     EPOCHS = config["epochs"]
 

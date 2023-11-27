@@ -40,10 +40,11 @@ class painn(nn.Module):
             nn.Linear(128, 128), nn.SiLU(), nn.Linear(128, 128)
         )
 
-    def forward(self, atomic_numbers, positional_encodings):
+    def forward(self, atomic_numbers, positional_encodings, graph_indicies):
         # Init for batch
         self.positions = torch.tensor(positional_encodings)
-        adj_list = positional_adjacency(self.positions, self.r_cut)
+        self.graph_indicies = graph_indicies
+        adj_list = positional_adjacency(self.positions, self.r_cut, self.graph_indicies)
         self.idx_i = adj_list[0]
         self.idx_j = adj_list[1]
         self.atomic = torch.tensor(atomic_numbers)
@@ -75,9 +76,17 @@ class painn(nn.Module):
             self.s = self.s + s
 
         out = self.output_layers(self.s)
-        out = torch.sum(out)
+        # Create a tensor for sums
+        num_items = graph_indicies[-1] + 1  # Assuming indexes start from 0
+        sums = torch.zeros(num_items, dtype=torch.float32)
+        indicies = torch.tensor(graph_indicies)
+        # Add the data to the sums tensor at the specified indexes
+        out = torch.squeeze(out)
+        out = torch.sum(out,dim=-1)
+        sums.index_add_(0, indicies, out)
 
-        return out
+
+        return sums
 
 
 class message(nn.Module):
@@ -179,12 +188,16 @@ class update(nn.Module):
         return out_v, out_s
 
 
-def positional_adjacency(molecule_pos: list, r: int) -> list:
+def positional_adjacency(molecule_pos: list, r: int, graph_indicies: list) -> list:
     adj_list = [[], []]
 
     for i, cur_atom in enumerate(molecule_pos):
         for j, adj_atom in enumerate(molecule_pos):
-            if not i == j and np.linalg.norm(cur_atom - adj_atom) <= r:
+            if (
+                not i == j
+                and np.linalg.norm(cur_atom - adj_atom) <= r
+                and graph_indicies[i] == graph_indicies[j]
+            ):
                 adj_list[0].append(i)
                 adj_list[1].append(j)
 
