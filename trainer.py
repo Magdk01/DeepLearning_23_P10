@@ -78,7 +78,7 @@ def run_epoch(loader, model, loss_fn, optimizer, scheduler, config, val_loader=N
 
             if enable_wandb:
                 wandb.log({"Mean Validation loss": alvl, "i-th_timestep": i})
-
+        break
     return model
 
 
@@ -115,6 +115,7 @@ def main():
         "smoothing_factor": 0.9,
         "plateau_decay": 0.5,
         "patience": 5,
+        "datetime": datetime.now(),
     }
 
     if enable_wandb:
@@ -122,7 +123,7 @@ def main():
         wandb.init(
             project="painn",
             entity="deep_learing_p10",
-            name=f"Train run for {Target_label}. Datetime :{datetime.now()}",
+            name=f"Train run for {Target_label}. Datetime :{config['datetime']}",
             config=config,
         )
 
@@ -139,9 +140,15 @@ def main():
 
     for i in tqdm(range(EPOCHS)):
         trained_model = run_epoch(
-            train_loader, model, loss, optimizer, scheduler, val_loader=val_loader
+            train_loader,
+            model,
+            loss,
+            optimizer,
+            scheduler,
+            config,
+            val_loader=val_loader,
         )
-        torch.save(trained_model, f"{Target_label}_model")
+        torch.save(trained_model, f"{Target_label}_model_{config['datetime']}.pth")
         if enable_wandb:
             wandb.log({"Epoch": i})
 
