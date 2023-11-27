@@ -148,7 +148,7 @@ def main():
             config,
             val_loader=val_loader,
         )
-        torch.save(trained_model, f"{Target_label.replace(" ", "_").lower()}_model_{config['datetime']}.pth")
+        torch.save(trained_model, f"{Target_label.replace(' ', '_').lower()}_model_{config['datetime']}.pth")
         if enable_wandb:
             wandb.log({"Epoch": i})
 
