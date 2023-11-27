@@ -46,7 +46,7 @@ def my_collate_fn(batch):
         modified_batch.append(data)
 
     # Return the batch data and the indexes
-    return modified_batch, indexes
+    return modified_batch, torch.tensor(indexes)
 
 
 # Function to create the dataset

@@ -82,9 +82,8 @@ class painn(nn.Module):
         indicies = torch.tensor(graph_indicies)
         # Add the data to the sums tensor at the specified indexes
         out = torch.squeeze(out)
-        out = torch.sum(out,dim=-1)
+        out = torch.sum(out, dim=-1)
         sums.index_add_(0, indicies, out)
-
 
         return sums
 
@@ -188,28 +187,51 @@ class update(nn.Module):
         return out_v, out_s
 
 
-def positional_adjacency(molecule_pos: list, r: int, graph_indicies: list) -> list:
+# def positional_adjacency(molecule_pos: list, r: int, graph_indicies: list) -> list:
+#     adj_list = [[], []]
+
+#     for i, cur_atom in enumerate(molecule_pos):
+#         for j, adj_atom in enumerate(molecule_pos):
+#             if (
+#                 not i == j
+#                 and np.linalg.norm(cur_atom - adj_atom) <= r
+#                 and graph_indicies[i] == graph_indicies[j]
+#             ):
+#                 adj_list[0].append(i)
+#                 adj_list[1].append(j)
+
+#     return adj_list
+
+
+def positional_adjacency(molecule_pos, r, graph_indices):
+
+
     adj_list = [[], []]
 
-    for i, cur_atom in enumerate(molecule_pos):
-        for j, adj_atom in enumerate(molecule_pos):
-            if (
-                not i == j
-                and np.linalg.norm(cur_atom - adj_atom) <= r
-                and graph_indicies[i] == graph_indicies[j]
-            ):
-                adj_list[0].append(i)
-                adj_list[1].append(j)
+    # Use broadcasting to find pairwise distances
+    dist_matrix = torch.norm(molecule_pos[:, None] - molecule_pos, dim=2)
+
+    # Create adjacency matrix based on distance and graph index criteria
+    adj_matrix = (dist_matrix <= r) & (graph_indices[:, None] == graph_indices)
+    adj_matrix.fill_diagonal_(0)  # Remove self-loops
+
+    # Convert adjacency matrix to edge list
+    adj_list = adj_matrix.nonzero(as_tuple=False).t().tolist()
 
     return adj_list
 
 
+# def r_ij_calc(adj_list, positions):
+#     r_ij = []
+#     for idx, i in enumerate(adj_list[0]):
+#         pos = positions[adj_list[0][idx]] - positions[adj_list[1][idx]]
+#         r_ij.append(pos)
+#     return np.array([r_ij[0]])
 def r_ij_calc(adj_list, positions):
-    r_ij = []
-    for idx, i in enumerate(adj_list[0]):
-        pos = positions[adj_list[0][idx]] - positions[adj_list[1][idx]]
-        r_ij.append(pos)
-    return np.array([r_ij[0]])
+    # Calculate r_ij for each pair
+    r_ij = positions[adj_list[0]] - positions[adj_list[1]]
+
+    return r_ij
 
 
 # def sum_over_j(v,idx_j):

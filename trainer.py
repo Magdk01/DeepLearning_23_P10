@@ -78,7 +78,6 @@ def run_epoch(loader, model, loss_fn, optimizer, scheduler, config, val_loader=N
 
             if enable_wandb:
                 wandb.log({"Mean Validation loss": alvl, "i-th_timestep": i})
-        break
     return model
 
 
@@ -105,7 +104,7 @@ def main():
     Target_label = target_dict[Target_index]
     print(f"Target label: {Target_label}")
     global enable_wandb
-    enable_wandb = True
+    enable_wandb = False
 
     config = {
         "learning_rate": 0.01,
@@ -148,7 +147,10 @@ def main():
             config,
             val_loader=val_loader,
         )
-        torch.save(trained_model, f"{Target_label.replace(' ', '_').lower()}_model_{config['datetime']}.pth")
+        torch.save(
+            trained_model,
+            f"{Target_label.replace(' ', '_').lower()}_model_{config['datetime']}.pth",
+        )
         if enable_wandb:
             wandb.log({"Epoch": i})
 
