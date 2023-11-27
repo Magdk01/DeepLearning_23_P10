@@ -9,6 +9,8 @@ from datetime import datetime
 from collections.abc import Iterable
 
 import argparse
+from torch.optim.lr_scheduler import ReduceLROnPlateau
+
 
 parser = argparse.ArgumentParser(description="Example script with CLI arguments.")
 parser.add_argument(
@@ -19,7 +21,7 @@ parser.add_argument(
 enable_wandb = False
 
 
-def run_epoch(loader, model, loss_fn, optimizer, val_loader=None):
+def run_epoch(loader, model, loss_fn, optimizer, scheduler, config, val_loader=None):
     def extract_and_calc_loss(x, inner_batch_indexies):
         atomic_numbers, coords, y = x
         atomic_numbers = np.array(atomic_numbers)
@@ -35,6 +37,9 @@ def run_epoch(loader, model, loss_fn, optimizer, val_loader=None):
         # Squared error as loss function
         # loss = (outputs - y) ** 2
         return loss
+
+    smoothed_loss = 0.0
+    alpha = config["smoothing_factor"]  # Smoothing factor
 
     total_iterations = len(loader)
     for i, (batch, batch_indexies) in tqdm(enumerate(loader), total=total_iterations):
@@ -68,6 +73,8 @@ def run_epoch(loader, model, loss_fn, optimizer, val_loader=None):
                 avg_loss_val_list.append(float(val_loss))
 
             alvl = np.mean(avg_loss_val_list)
+            smoothed_loss = (alpha * smoothed_loss) + ((1 - alpha) * alvl)
+            scheduler.step(smoothed_loss)
 
             if enable_wandb:
                 wandb.log({"Mean Validation loss": alvl, "i-th_timestep": i})
@@ -103,8 +110,11 @@ def main():
     config = {
         "learning_rate": 0.01,
         "epochs": 1,
-        "batch_size": 1,
+        "batch_size": 8,
         "target_label": Target_label,
+        "smoothing_factor": 0.9,
+        "plateau_decay": 0.5,
+        "patience": 5,
     }
 
     if enable_wandb:
@@ -117,16 +127,19 @@ def main():
         )
 
     train_loader, test_loader, val_loader = DataLoad(
-        batch_size=16, target_index=Target_index
+        batch_size=config["batch_size"], target_index=Target_index
     )
     model = painn()
     loss = torch.nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=config["learning_rate"])
     EPOCHS = config["epochs"]
+    scheduler = ReduceLROnPlateau(
+        optimizer, factor=config["plateau_decay"], patience=config["patience"]
+    )
 
     for i in tqdm(range(EPOCHS)):
         trained_model = run_epoch(
-            train_loader, model, loss, optimizer, val_loader=val_loader
+            train_loader, model, loss, optimizer, scheduler, val_loader=val_loader
         )
         torch.save(trained_model, f"{Target_label}_model")
         if enable_wandb:
