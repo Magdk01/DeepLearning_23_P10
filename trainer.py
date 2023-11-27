@@ -6,34 +6,28 @@ import numpy as np
 
 import wandb
 from datetime import datetime
+from collections.abc import Iterable
 
-# WandB setup
-config = {
-    "learning_rate": 0.001,
-    "epochs": 1,
-    "batch_size": 1,
-}
+import argparse
 
-enable_wandb = True
-if enable_wandb:
-    wandb.login()
-    wandb.init(
-        project="painn",
-        entity="deep_learing_p10",
-        name=f"Run_at:{datetime.now()}",
-        config=config,
-    )
+parser = argparse.ArgumentParser(description="Example script with CLI arguments.")
+parser.add_argument(
+    "--target_index", type=int, default=0, help="Index for target label"
+)
 
 
-def run_epoch(loader, model, loss_fn, optimizer, batch_indexies, val_loader=None):
-    def extract_and_calc_loss(x):
+enable_wandb = False
+
+
+def run_epoch(loader, model, loss_fn, optimizer, val_loader=None):
+    def extract_and_calc_loss(x, inner_batch_indexies):
         atomic_numbers, coords, y = x
         atomic_numbers = np.array(atomic_numbers)
         coords = np.array(coords)
-        y = y[0][0]
+        # y = y[0][0]
 
         # Make predictions for this batch
-        outputs = model(atomic_numbers, coords, batch_indexies)
+        outputs = model(atomic_numbers, coords, inner_batch_indexies)
         # assert not np.isnan(outputs.item())
 
         # Compute the loss and its gradients
@@ -42,12 +36,16 @@ def run_epoch(loader, model, loss_fn, optimizer, batch_indexies, val_loader=None
         # loss = (outputs - y) ** 2
         return loss
 
-    for i, (batch, batch_indexies) in enumerate(loader):
-        concatenated_list = [torch.cat(elements) for elements in zip(*batch)]
-        # for j, x in enumerate(batch):
-        # Zero your gradients for every batch!
+    total_iterations = len(loader)
+    for i, (batch, batch_indexies) in tqdm(enumerate(loader), total=total_iterations):
+        batch_save = batch
+        concatenated_list = [
+            torch.cat(elements) if not idx == 2 else torch.tensor([elements])
+            for idx, elements in enumerate(zip(*batch))
+        ]
+
         optimizer.zero_grad()
-        loss = extract_and_calc_loss(concatenated_list)
+        loss = extract_and_calc_loss(concatenated_list, batch_indexies)
 
         loss.backward()
 
@@ -57,38 +55,80 @@ def run_epoch(loader, model, loss_fn, optimizer, batch_indexies, val_loader=None
         if enable_wandb:
             wandb.log({"Train loss": loss})
 
-        if i + 1 % 1000 == 0 and val_loader:
-            # print(i)
+        if (i + 1) % 10 == 0:
             avg_loss_val_list = []
-            val_load = val_loader.__iter__()
-            for _ in range(100):
-                avg_loss_val_list.append(extract_and_calc_loss(next(val_load)[0]))
+            for val_i, (val_batch, val_batch_indexies) in enumerate(val_loader):
+                val_concatenated_list = [
+                    torch.cat(elements) if not idx == 2 else torch.tensor([elements])
+                    for idx, elements in enumerate(zip(*val_batch))
+                ]
+                val_loss = extract_and_calc_loss(
+                    val_concatenated_list, val_batch_indexies
+                )
+                avg_loss_val_list.append(float(val_loss))
 
-            avg_loss_val_list = torch.tensor(avg_loss_val_list)
-            print(f"Mean Validation loss: {(alvl:=torch.mean(avg_loss_val_list))}")
+            alvl = np.mean(avg_loss_val_list)
 
             if enable_wandb:
                 wandb.log({"Mean Validation loss": alvl, "i-th_timestep": i})
 
-    return True
+    return model
+
+
+target_dict = {
+    0: "Dipole moment",
+    1: "Isotropic polarizability",
+    2: "Highest occupied molecular orbital energy",
+    3: "Lowest unoccupied molecular orbital energy",
+    4: "Gap between HOMO and LUMO",
+    5: "Electronic Spatial extent",
+    6: "Zero point vibrational energy",
+    7: "Internal energy at 0K",
+    8: "Internal energy at 298.15K",
+    9: "Enthalpy at 298.15K",
+    10: "Free energy at 298.15K",
+    11: "Heat capacity at 298.15K",
+}
 
 
 def main():
-    train_loader, test_loader, val_loader = DataLoad(batch_size=4)
+    args = parser.parse_args()
+    Target_index = args.target_index
+    # Target_index = 0
+    Target_label = target_dict[Target_index]
+    print(f"Target label: {Target_label}")
+    global enable_wandb
+    enable_wandb = True
+
+    config = {
+        "learning_rate": 0.01,
+        "epochs": 1,
+        "batch_size": 1,
+        "target_label": Target_label,
+    }
+
+    if enable_wandb:
+        wandb.login()
+        wandb.init(
+            project="painn",
+            entity="deep_learing_p10",
+            name=f"Train run for {Target_label}. Datetime :{datetime.now()}",
+            config=config,
+        )
+
+    train_loader, test_loader, val_loader = DataLoad(
+        batch_size=16, target_index=Target_index
+    )
     model = painn()
     loss = torch.nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=config["learning_rate"])
     EPOCHS = config["epochs"]
 
     for i in tqdm(range(EPOCHS)):
-        # print("Training")
-        train_loss = run_epoch(train_loader, model, loss, optimizer, val_loader)
-        # print(train_loss)
-
-        # print("Testing")
-        test_loss = run_epoch(test_loader, model, loss, optimizer)
-        # print(test_loss)
-
+        trained_model = run_epoch(
+            train_loader, model, loss, optimizer, val_loader=val_loader
+        )
+        torch.save(trained_model, f"{Target_label}_model")
         if enable_wandb:
             wandb.log({"Epoch": i})
 

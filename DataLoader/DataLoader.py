@@ -8,8 +8,9 @@ from torch.utils.data import DataLoader
 # Dataset class
 class QM9Dataset(Dataset):
     # Initialize the dataset object
-    def __init__(self, data):
+    def __init__(self, data, target_index):
         self.dataset = data
+        self.target_index = target_index
 
     # Return the length of the dataset
     def __len__(self):
@@ -24,7 +25,7 @@ class QM9Dataset(Dataset):
         coords = batch.pos
 
         # Variable to predict
-        y = batch.y
+        y = batch.y[0][self.target_index]
 
         # Combine the atomic numbers, coordinates and variable to predict
         return atomic_numbers, coords, y
@@ -49,17 +50,19 @@ def my_collate_fn(batch):
 
 
 # Function to create the dataset
-def DataLoad(batch_size=1, shuffle=False, split=[0.8, 0.1, 0.1]):
+def DataLoad(batch_size=1, shuffle=False, split=[0.8, 0.1, 0.1], target_index=0):
     # Create the dataset
     data = QM9(root="./QM9")
 
     # Create the dataset object
-    dataset = QM9Dataset(data)
+    dataset = QM9Dataset(data, target_index)
 
-    # Train-test split
-    train_size = int(split[0] * len(dataset))
-    test_size = int(split[1] * len(dataset))
-    val_size = len(dataset) - train_size - test_size
+    total_size = len(dataset) - 64  # Reserve 64 for the validation set
+    train_size = int(split[0] * total_size)
+    test_size = total_size - train_size  # Adjust test size accordingly
+
+    # Validation size is set to 64
+    val_size = 64
 
     train_dataset, test_dataset, val_dataset = torch.utils.data.random_split(
         dataset, [train_size, test_size, val_size]
