@@ -18,7 +18,8 @@ parser.add_argument(
 )
 
 
-enable_wandb = False
+global enable_wandb
+enable_wandb = True
 
 
 def run_epoch(loader, model, loss_fn, optimizer, scheduler, config, val_loader=None):
@@ -103,8 +104,6 @@ def main():
     # Target_index = 0
     Target_label = target_dict[Target_index]
     print(f"Target label: {Target_label}")
-    global enable_wandb
-    enable_wandb = False
 
     config = {
         "learning_rate": 0.01,
