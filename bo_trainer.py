@@ -110,7 +110,7 @@ def main():
     )
     
     result = tune.run(
-        partial(config, Target_index),
+        partial(run_training, config=config, Target_index=Target_index),
         scheduler=BO_scheduler,
         config=config,
         num_samples=10
