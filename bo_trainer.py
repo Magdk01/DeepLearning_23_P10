@@ -120,3 +120,6 @@ def main():
     print(f"Best trial config: {best_trial.config}")
     print(f"Best trial final validation loss: {best_trial.last_result['loss']}")
     print(f"Best trial final validation accuracy: {best_trial.last_result['accuracy']}")
+    
+if __name__ == "__main__":
+    main()
