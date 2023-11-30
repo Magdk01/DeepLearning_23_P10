@@ -24,22 +24,11 @@ class QM9Dataset(Dataset):
         atomic_numbers = batch.z
         coords = batch.pos
 
-        # q = atomic_numbers copied 3 times 
-        q = [num.item() for num in atomic_numbers for _ in range(3)]
-
-        # R_ij = 3x(len(atomic_numbers) * 3))
-        r_ij = torch.zeros((3, len(atomic_numbers) * 3))
-
-        # Get the distance between atoms
-        for i in range(r_ij.shape[0]):
-            for j in range(r_ij.shape[1]):
-                r_ij[i][j] = coords[j//3][i] - coords[j%3][i]
-
         # Variable to predict
         y = batch.y[0][self.target_index]
 
         # Combine the atomic numbers, coordinates and variable to predict
-        return q, r_ij, y
+        return atomic_numbers, coords, y
 
 
 def my_collate_fn(batch):
