@@ -10,34 +10,34 @@ def hadamard(m1, m2):
 
 
 class painn(nn.Module):
-    def __init__(self, r_cut=2, n=20) -> None:
+    def __init__(self, r_cut=2, n=20, f=128) -> None:
         super(painn, self).__init__()
         self.device = "cuda:0"
         self.r_cut = r_cut
         self.n = n
-        self.embedding_layer = nn.Sequential(nn.Embedding(10, 128))
+        self.embedding_layer = nn.Sequential(nn.Embedding(10, f))
 
         # Message layers
         self.shared_ø_layer = nn.Sequential(
-            nn.Linear(128, 128),
+            nn.Linear(f, f),
             nn.SiLU(),
-            nn.Linear(128, 384),
+            nn.Linear(f, 3*f),
         )
         message_model = message(self.r_cut, self.n, self.shared_ø_layer)
         self.message_models = [message_model] * 3
 
         # Update layers
         self.shared_a = nn.Sequential(
-            nn.Linear(256, 128), nn.SiLU(), nn.Linear(128, 384)
+            nn.Linear(2*f, f), nn.SiLU(), nn.Linear(f, 3*f)
         )
-        self.shared_V = nn.Sequential(nn.Linear(128, 128, bias=True))
-        self.shared_U = nn.Sequential(nn.Linear(128, 128, bias=True))
+        self.shared_V = nn.Sequential(nn.Linear(f, f, bias=True))
+        self.shared_U = nn.Sequential(nn.Linear(f, f, bias=True))
         update_model = update(self.shared_a, self.shared_V, self.shared_U)
         self.update_models = [update_model] * 3
 
         # Output layers
         self.output_layers = nn.Sequential(
-            nn.Linear(128, 128), nn.SiLU(), nn.Linear(128, 128)
+            nn.Linear(f, f), nn.SiLU(), nn.Linear(f, f)
         )
 
     def forward(self, atomic_numbers, positional_encodings, graph_indicies):
@@ -56,7 +56,7 @@ class painn(nn.Module):
         self.s = self.embedding_layer(self.atomic).unsqueeze(1)
 
         # Then scaling to match all connections in molecule
-        self.v = torch.zeros((self.s.shape[0], 3, 128))
+        self.v = torch.zeros((self.s.shape[0], 3, f))
 
         for idx in range(3):
             v, s = self.v.detach().clone(), self.s.detach().clone()
@@ -94,13 +94,13 @@ class message(nn.Module):
         self.ø = ø_layer
         self.r_cut = r_cut
         self.n = n
-        self.internal_w_layer = nn.Sequential(nn.Linear(20, 384, bias=True))
+        self.internal_w_layer = nn.Sequential(nn.Linear(20, 3*f, bias=True))
 
     def forward(self, s, r, v, idx_i):
         # s-block
         ø_out = self.ø(s)
         org_r = r.detach().clone()
-        assert ø_out.size(2) == 384
+        assert ø_out.size(2) == 3*f
 
         # left r-block
         r = self.__rbf(r, self.n)
@@ -108,26 +108,26 @@ class message(nn.Module):
         w = self.internal_w_layer(r)
         # w = self.__fcut(r, self.r_cut)
 
-        assert w.size(2) == 384
+        assert w.size(2) == 3*f
 
         split = hadamard(w, ø_out)
-        split_tensor = torch.split(split, 128, dim=2)
+        split_tensor = torch.split(split, f, dim=2)
 
         # out_s = torch.sum(split_tensor[1], axis=0)
-        out_s = torch.zeros(len(set(idx_i)), 1, 128)
+        out_s = torch.zeros(len(set(idx_i)), 1, f)
         for idx, i in enumerate(idx_i):
             out_s[i] += split_tensor[1][idx]
 
         # right r-block
         org_r = org_r / torch.norm(org_r)
-        # org_r = torch.norm(org_r, dim=1).unsqueeze(1).unsqueeze(2).repeat(1, 1, 128)
-        org_r = org_r.unsqueeze(2).repeat(1, 1, 128)
+        # org_r = torch.norm(org_r, dim=1).unsqueeze(1).unsqueeze(2).repeat(1, 1, f)
+        org_r = org_r.unsqueeze(2).repeat(1, 1, f)
         org_r = hadamard(split_tensor[2], org_r)  # To fix di
 
         # v-block
         v = hadamard(split_tensor[0], v)
         v = torch.add(org_r, v)
-        out_v = torch.zeros(len(set(idx_i)), 3, 128)
+        out_v = torch.zeros(len(set(idx_i)), 3, f)
         for idx, i in enumerate(idx_i):
             out_v[i] += v[idx]
         # out_v = torch.sum(v, axis=0)
@@ -173,7 +173,7 @@ class update(nn.Module):
         # s-block
         s_stack = torch.cat((torch.norm(v, dim=1, keepdim=True), s), axis=2)
         split = self.a(s_stack)
-        split_tensor = torch.split(split, 128, dim=2)
+        split_tensor = torch.split(split, f, dim=2)
         # left v-block continues
         out_v = hadamard(u, split_tensor[0])
 
