@@ -19,7 +19,7 @@ parser.add_argument(
 
 
 global enable_wandb
-enable_wandb = True
+enable_wandb = False
 
 def extract_and_calc_loss(x, model, loss_fn, inner_batch_indexies):
     atomic_numbers, coords, y = x
@@ -180,4 +180,5 @@ def main():
         wandb.log({"Test Loss": test_loss})
 
 if __name__ == "__main__":
+    torch.manual_seed(6)
     main()
