@@ -21,24 +21,24 @@ parser.add_argument(
 global enable_wandb
 enable_wandb = True
 
+def extract_and_calc_loss(x, model, loss_fn, inner_batch_indexies):
+    atomic_numbers, coords, y = x
+    atomic_numbers = np.array(atomic_numbers)
+    coords = np.array(coords)
+    # y = y[0][0]
+
+    # Make predictions for this batch
+    outputs = model(atomic_numbers, coords, inner_batch_indexies)
+    # assert not np.isnan(outputs.item())
+
+    # Compute the loss and its gradients
+    loss = loss_fn(outputs, y)
+    # Squared error as loss function
+    # loss = (outputs - y) ** 2
+    return loss
+
 
 def run_epoch(loader, model, loss_fn, optimizer, scheduler, config, val_loader=None):
-    def extract_and_calc_loss(x, inner_batch_indexies):
-        atomic_numbers, coords, y = x
-        atomic_numbers = np.array(atomic_numbers)
-        coords = np.array(coords)
-        # y = y[0][0]
-
-        # Make predictions for this batch
-        outputs = model(atomic_numbers, coords, inner_batch_indexies)
-        # assert not np.isnan(outputs.item())
-
-        # Compute the loss and its gradients
-        loss = loss_fn(outputs, y)
-        # Squared error as loss function
-        # loss = (outputs - y) ** 2
-        return loss
-
     smoothed_loss = 0.0
     alpha = config["smoothing_factor"]  # Smoothing factor
 
@@ -51,7 +51,7 @@ def run_epoch(loader, model, loss_fn, optimizer, scheduler, config, val_loader=N
         ]
 
         optimizer.zero_grad()
-        loss = extract_and_calc_loss(concatenated_list, batch_indexies)
+        loss = extract_and_calc_loss(concatenated_list, model, loss_fn, batch_indexies)
 
         loss.backward()
 
@@ -69,7 +69,7 @@ def run_epoch(loader, model, loss_fn, optimizer, scheduler, config, val_loader=N
                     for idx, elements in enumerate(zip(*val_batch))
                 ]
                 val_loss = extract_and_calc_loss(
-                    val_concatenated_list, val_batch_indexies
+                    val_concatenated_list, model, loss_fn, val_batch_indexies
                 )
                 avg_loss_val_list.append(float(val_loss))
 
@@ -80,6 +80,20 @@ def run_epoch(loader, model, loss_fn, optimizer, scheduler, config, val_loader=N
             if enable_wandb:
                 wandb.log({"Mean Validation loss": alvl, "i-th_timestep": i})
     return model
+
+def run_test(test_loader, test_model, test_loss_fn):
+    avg_loss_test_list = []
+    for test_i, (test_batch, test_batch_indexies) in enumerate(test_loader):
+        test_concatenated_list = [
+            torch.cat(elements) if not idx == 2 else torch.tensor([elements])
+            for idx, elements in enumerate(zip(*test_batch))
+        ]
+        test_loss = extract_and_calc_loss(
+            test_concatenated_list, test_model, test_loss_fn, test_batch_indexies
+        )
+        avg_loss_test_list.append(float(test_loss))
+
+    return np.mean(avg_loss_test_list)
 
 
 target_dict = {
@@ -159,7 +173,11 @@ def main():
         )
         if enable_wandb:
             wandb.log({"Epoch": i})
-
+    
+    torch.optim.swa_utils.update_bn(train_loader, swa_model)
+    test_loss = run_test(test_loader, swa_model, torch.nn.L1Loss())
+    if enable_wandb:
+        wandb.log({"Test Loss": test_loss})
 
 if __name__ == "__main__":
     main()
