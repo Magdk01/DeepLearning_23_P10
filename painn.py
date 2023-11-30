@@ -22,14 +22,14 @@ class painn(nn.Module):
         self.shared_ø_layer = nn.Sequential(
             nn.Linear(self.f, self.f),
             nn.SiLU(),
-            nn.Linear(self.f, 3*self.f),
+            nn.Linear(self.f, 3 * self.f),
         )
         message_model = message(self.r_cut, self.n, self.shared_ø_layer, self.f)
         self.message_models = [message_model] * 3
 
         # Update layers
         self.shared_a = nn.Sequential(
-            nn.Linear(2*self.f, self.f), nn.SiLU(), nn.Linear(self.f, 3*self.f)
+            nn.Linear(2 * self.f, self.f), nn.SiLU(), nn.Linear(self.f, 3 * self.f)
         )
         self.shared_V = nn.Sequential(nn.Linear(self.f, self.f, bias=True))
         self.shared_U = nn.Sequential(nn.Linear(self.f, self.f, bias=True))
@@ -63,7 +63,7 @@ class painn(nn.Module):
             v, s = self.v.detach().clone(), self.s.detach().clone()
 
             self.v, self.s = self.message_models[idx](
-                self.s[self.idx_j], self.r, v[self.idx_j], self.idx_i
+                self.s[self.idx_i], self.r, v[self.idx_i], self.idx_i
             )
 
             self.v = self.v + v
@@ -96,13 +96,13 @@ class message(nn.Module):
         self.r_cut = r_cut
         self.n = n
         self.f = f
-        self.internal_w_layer = nn.Sequential(nn.Linear(20, 3*self.f, bias=True))
+        self.internal_w_layer = nn.Sequential(nn.Linear(20, 3 * self.f, bias=True))
 
     def forward(self, s, r, v, idx_i):
         # s-block
         ø_out = self.ø(s)
         org_r = r.detach().clone()
-        assert ø_out.size(2) == 3*self.f
+        assert ø_out.size(2) == 3 * self.f
 
         # left r-block
         r = self.__rbf(r, self.n)
@@ -110,7 +110,7 @@ class message(nn.Module):
         w = self.internal_w_layer(r)
         # w = self.__fcut(r, self.r_cut)
 
-        assert w.size(2) == 3*self.f
+        assert w.size(2) == 3 * self.f
 
         split = hadamard(w, ø_out)
         split_tensor = torch.split(split, self.f, dim=2)
@@ -160,7 +160,7 @@ class message(nn.Module):
 
 
 class update(nn.Module):
-    def __init__(self, a, V, U, f = 128) -> None:
+    def __init__(self, a, V, U, f=128) -> None:
         super(update, self).__init__()
         self.a = a
         self.V = V
@@ -190,25 +190,7 @@ class update(nn.Module):
         return out_v, out_s
 
 
-# def positional_adjacency(molecule_pos: list, r: int, graph_indicies: list) -> list:
-#     adj_list = [[], []]
-
-#     for i, cur_atom in enumerate(molecule_pos):
-#         for j, adj_atom in enumerate(molecule_pos):
-#             if (
-#                 not i == j
-#                 and np.linalg.norm(cur_atom - adj_atom) <= r
-#                 and graph_indicies[i] == graph_indicies[j]
-#             ):
-#                 adj_list[0].append(i)
-#                 adj_list[1].append(j)
-
-#     return adj_list
-
-
 def positional_adjacency(molecule_pos, r, graph_indices):
-
-
     adj_list = [[], []]
 
     # Use broadcasting to find pairwise distances
@@ -224,20 +206,11 @@ def positional_adjacency(molecule_pos, r, graph_indices):
     return adj_list
 
 
-# def r_ij_calc(adj_list, positions):
-#     r_ij = []
-#     for idx, i in enumerate(adj_list[0]):
-#         pos = positions[adj_list[0][idx]] - positions[adj_list[1][idx]]
-#         r_ij.append(pos)
-#     return np.array([r_ij[0]])
 def r_ij_calc(adj_list, positions):
     # Calculate r_ij for each pair
     r_ij = positions[adj_list[0]] - positions[adj_list[1]]
 
     return r_ij
-
-
-# def sum_over_j(v,idx_j):
 
 
 if __name__ == "__main__":
