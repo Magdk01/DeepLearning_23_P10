@@ -114,6 +114,7 @@ def main():
         "plateau_decay": 0.5,
         "patience": 5,
         "datetime": datetime.now(),
+        'weight_decay': 0.01
     }
 
     if enable_wandb:
@@ -130,7 +131,7 @@ def main():
     )
     model = painn()
     loss = torch.nn.MSELoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=config["learning_rate"])
+    optimizer = torch.optim.AdamW(model.parameters(), lr=config["learning_rate"], weight_decay=config['weight_decay'])
     EPOCHS = config["epochs"]
     scheduler = ReduceLROnPlateau(
         optimizer, factor=config["plateau_decay"], patience=config["patience"]
