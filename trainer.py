@@ -114,7 +114,8 @@ def main():
         "plateau_decay": 0.5,
         "patience": 5,
         "datetime": datetime.now(),
-        'weight_decay': 0.01
+        'weight_decay': 0.01,
+        'swa_start': 2,
     }
 
     if enable_wandb:
@@ -136,17 +137,22 @@ def main():
     scheduler = ReduceLROnPlateau(
         optimizer, factor=config["plateau_decay"], patience=config["patience"]
     )
-
+    swa_scheduler = torch.optim.swa_utils.SWALR(optimizer, swa_lr=config["learning_rate"])
+    swa_model = torch.optim.swa_utils.AveragedModel(model)
     for i in tqdm(range(EPOCHS)):
+        current_scheduler = scheduler if i < config['swa_start'] else swa_scheduler
         trained_model = run_epoch(
             train_loader,
             model,
             loss,
             optimizer,
-            scheduler,
+            current_scheduler,
             config,
             val_loader=val_loader,
         )
+        if i > config['swa_start']:
+            swa_model.update_parameters(model)
+        
         torch.save(
             trained_model,
             f"{Target_label.replace(' ', '_').lower()}_model_{config['datetime']}.pth",
