@@ -17,22 +17,24 @@ class painn(nn.Module):
         self.n = n
         self.f = f
         self.embedding_layer = nn.Sequential(nn.Embedding(10, self.f))
-
         # Message layers
+
         self.shared_ø_layer = nn.Sequential(
-            nn.Linear(self.f, self.f),
-            nn.SiLU(),
-            nn.Linear(self.f, 3 * self.f),
+            nn.Linear(self.f, self.f), nn.SiLU(), nn.Linear(self.f, 3 * self.f)
         )
+
         message_model = message(self.r_cut, self.n, self.shared_ø_layer, self.f)
         self.message_models = [message_model] * 3
 
         # Update layers
+
         self.shared_a = nn.Sequential(
             nn.Linear(2 * self.f, self.f), nn.SiLU(), nn.Linear(self.f, 3 * self.f)
         )
+
         self.shared_V = nn.Sequential(nn.Linear(self.f, self.f, bias=False))
         self.shared_U = nn.Sequential(nn.Linear(self.f, self.f, bias=False))
+
         update_model = update(self.shared_a, self.shared_V, self.shared_U, self.f)
         self.update_models = [update_model] * 3
 
@@ -115,39 +117,32 @@ class message(nn.Module):
         split = hadamard(w, ø_out)
         split_tensor = torch.split(split, self.f, dim=2)
 
-        # out_s = torch.sum(split_tensor[1], axis=0)
         out_s = torch.zeros(len(set(idx_i)), 1, self.f)
         for idx, i in enumerate(idx_i):
             out_s[i] += split_tensor[1][idx]
 
         # right r-block
         org_r = org_r / torch.norm(org_r)
-        # org_r = torch.norm(org_r, dim=1).unsqueeze(1).unsqueeze(2).repeat(1, 1, f)
         org_r = org_r.unsqueeze(2).repeat(1, 1, self.f)
-        org_r = hadamard(split_tensor[2], org_r)  # To fix di
+        org_r = hadamard(split_tensor[2], org_r)
 
         # v-block
         v = hadamard(split_tensor[0], v)
         v = torch.add(org_r, v)
+
         out_v = torch.zeros(len(set(idx_i)), 3, self.f)
         for idx, i in enumerate(idx_i):
             out_v[i] += v[idx]
-        # out_v = torch.sum(v, axis=0)
 
         return out_v, out_s
 
     def __rbf(self, input, n):
         n_values = torch.arange(1, n + 1).float()  # Shape: (n,)
         r_norms = torch.norm(input, dim=1, keepdim=True)  # Shape: (12,)
-
         # Broadcasting r_norms to (12, n) and n_values to (12, n)
         r_norms = r_norms.unsqueeze(2).expand(-1, -1, n)
-
         n_values = n_values.unsqueeze(0).expand(r_norms.shape[0], 1, -1)
-
-        res = torch.sin((n_values * torch.pi) / self.r_cut * r_norms) / r_norms
-
-        return res
+        return torch.sin((n_values * torch.pi) / self.r_cut * r_norms) / r_norms
 
     def __fcut(self, tensor, R_c):
         # Applying the cosine cutoff function element-wise
@@ -181,7 +176,7 @@ class update(nn.Module):
         out_v = hadamard(u, split_tensor[0])
 
         # right v-block continues
-        # s = torch.tensordot(v, u, dims=len(v))
+
         s = torch.sum((u * v), dim=1).unsqueeze(1)
 
         s = hadamard(s, split_tensor[1])
@@ -215,23 +210,18 @@ def r_ij_calc(adj_list, positions):
 
 if __name__ == "__main__":
     print("hej")
+    from DataLoader.DataLoader import DataLoad
+    from trainer import extract_and_calc_loss
 
-    numbers = np.array([6, 1, 1, 1])
-    positions = np.array(
-        [
-            [-0.0126981359, 1.0858041578, 0.0080009958],
-            [0.002150416, -0.0060313176, 0.0019761204],
-            [1.0117308433, 1.4637511618, 0.0002765748],
-            [-0.540815069, 1.4475266138, -0.8766437152],
+    train_loader, test_loader, val_loader = DataLoad(batch_size=4, target_index=0)
+    for batch, batch_indexies in train_loader:
+        concatenated_list = [
+            torch.cat(elements) if not idx == 2 else torch.tensor([elements])
+            for idx, elements in enumerate(zip(*batch))
         ]
-    )
+        loss = extract_and_calc_loss(
+            concatenated_list, painn(), torch.nn.MSELoss(), batch_indexies
+        )
+        print(loss)
 
-    n = 12
-
-    # atomic_number = torch.randint(low=0, high=8, size=(n, 1))
-    # pos = torch.randn(n, 3)
-    model = painn()
-    for name, param in model.named_parameters():
-        print(name, param.requires_grad)
-
-    print(model(numbers, positions))
+        break
