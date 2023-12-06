@@ -31,8 +31,8 @@ class painn(nn.Module):
         self.shared_a = nn.Sequential(
             nn.Linear(2 * self.f, self.f), nn.SiLU(), nn.Linear(self.f, 3 * self.f)
         )
-        self.shared_V = nn.Sequential(nn.Linear(self.f, self.f, bias=True))
-        self.shared_U = nn.Sequential(nn.Linear(self.f, self.f, bias=True))
+        self.shared_V = nn.Sequential(nn.Linear(self.f, self.f, bias=False))
+        self.shared_U = nn.Sequential(nn.Linear(self.f, self.f, bias=False))
         update_model = update(self.shared_a, self.shared_V, self.shared_U, self.f)
         self.update_models = [update_model] * 3
 
