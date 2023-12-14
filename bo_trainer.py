@@ -33,7 +33,7 @@ target_dict = {
     11: "Heat capacity at 298.15K",
 }
 
-def run_training(config, Target_index):
+def run_training(config, Target_index=0):
     Target_label = target_dict[Target_index]
     train_loader, test_loader, val_loader = DataLoad(
         batch_size=config["batch_size"], target_index=Target_index
@@ -68,8 +68,8 @@ def run_training(config, Target_index):
         if enable_wandb:
             wandb.log({"Epoch": i})
     
-    torch.optim.swa_utils.update_bn(train_loader, swa_model)
-    test_loss = run_test(test_loader, swa_model, torch.nn.L1Loss())
+    #torch.optim.swa_utils.update_bn(train_loader, swa_model)
+    #test_loss = run_test(test_loader, swa_model, torch.nn.L1Loss())
     if enable_wandb:
         wandb.log({"Test Loss": test_loss})
 
@@ -90,7 +90,7 @@ def main():
         "patience": tune.uniform(0.0,10.0),
         "datetime": datetime.now(),
         'weight_decay': tune.loguniform(1e-4, 1e-1),
-        'swa_start': 2,
+        'swa_start': 10000,
     }
 
     if enable_wandb:
@@ -104,16 +104,18 @@ def main():
     BO_scheduler = ASHAScheduler(
         metric="loss",
         mode="min",
-        max_t=config["epochs"],
+        max_t=10,
         grace_period=1,
         reduction_factor=2,
     )
     
     result = tune.run(
-        partial(run_training, config=config, Target_index=Target_index),
+        partial(run_training, Target_index=Target_index),
+        resources_per_trial={"cpu": 24, "gpu": 1},
         scheduler=BO_scheduler,
         config=config,
-        num_samples=10
+        num_samples=1,
+        stop={"training_iteration": 5 * int(config['epochs'])}
     )
     
     best_trial = result.get_best_trial("loss", "min", "last")
@@ -122,4 +124,5 @@ def main():
     print(f"Best trial final validation accuracy: {best_trial.last_result['accuracy']}")
     
 if __name__ == "__main__":
+    torch.manual_seed(6)
     main()

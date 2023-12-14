@@ -11,6 +11,7 @@ from collections.abc import Iterable
 import argparse
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
+from ray import train
 
 parser = argparse.ArgumentParser(description="Example script with CLI arguments.")
 parser.add_argument(
@@ -19,7 +20,7 @@ parser.add_argument(
 
 
 global enable_wandb
-enable_wandb = False
+enable_wandb = True
 
 def extract_and_calc_loss(x, model, loss_fn, inner_batch_indexies):
     atomic_numbers, coords, y = x
@@ -79,6 +80,7 @@ def run_epoch(loader, model, loss_fn, optimizer, scheduler, config, val_loader=N
 
             if enable_wandb:
                 wandb.log({"Mean Validation loss": alvl, "i-th_timestep": i})
+    train.report({"loss": alvl})
     return model
 
 def run_test(test_loader, test_model, test_loss_fn):
@@ -120,16 +122,16 @@ def main():
     print(f"Target label: {Target_label}")
 
     config = {
-        "learning_rate": 0.01,
-        "epochs": 1,
-        "batch_size": 8,
+        "learning_rate": 0.005,
+        "epochs": 5,
+        "batch_size": 16,
         "target_label": Target_label,
-        "smoothing_factor": 0.9,
-        "plateau_decay": 0.5,
-        "patience": 5,
+        "smoothing_factor": 0.5,
+        "plateau_decay": 0.6,
+        "patience": 6,
         "datetime": datetime.now(),
-        'weight_decay': 0.01,
-        'swa_start': 2,
+        'weight_decay': 0.07,
+        'swa_start': 1000,
     }
 
     if enable_wandb:
