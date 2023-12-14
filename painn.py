@@ -10,7 +10,7 @@ def hadamard(m1, m2):
 
 
 class painn(nn.Module):
-    def __init__(self, r_cut=2, n=20, f=128) -> None:
+    def __init__(self, r_cut=2, n=20, f=128, shared =True) -> None:
         super(painn, self).__init__()
         self.device = "cuda:0"
         self.r_cut = r_cut
@@ -19,25 +19,68 @@ class painn(nn.Module):
         self.embedding_layer = nn.Sequential(nn.Embedding(10, self.f))
         # Message layers
 
-        self.shared_ø_layer = nn.Sequential(
-            nn.Linear(self.f, self.f), nn.SiLU(), nn.Linear(self.f, 3 * self.f)
-        )
-        self.w_layer = nn.Sequential(nn.Linear(20, 3 * self.f, bias=True))
+        if not shared:
+            self.ø_layer_1 =  nn.Sequential(
+                nn.Linear(self.f, self.f), nn.SiLU(), nn.Linear(self.f, 3 * self.f))
+            self.w_layer_1 = nn.Sequential(nn.Linear(20, 3 * self.f, bias=True))
+            self.message_model_1 = message(self.r_cut, self.n, self.ø_layer_1, self.w_layer_1, self.f)
+        
+            self.ø_layer_2 =  nn.Sequential(
+                nn.Linear(self.f, self.f), nn.SiLU(), nn.Linear(self.f, 3 * self.f))
+            self.w_layer_2 = nn.Sequential(nn.Linear(20, 3 * self.f, bias=True))
+            self.message_model_2 = message(self.r_cut, self.n, self.ø_layer_2, self.w_layer_2, self.f)
 
-        message_model = message(self.r_cut, self.n, self.shared_ø_layer, self.w_layer, self.f)
-        self.message_models = [message_model] * 3
+            self.ø_layer_3 =  nn.Sequential(
+                nn.Linear(self.f, self.f), nn.SiLU(), nn.Linear(self.f, 3 * self.f))
+            self.w_layer_3 = nn.Sequential(nn.Linear(20, 3 * self.f, bias=True))
+            self.message_model_3 = message(self.r_cut, self.n, self.ø_layer_3, self.w_layer_3, self.f)
+            
+            self.message_models = [self.message_model_1, self.message_model_2, self.message_model_3]
+            
+        else:
+            self.shared_ø_layer = nn.Sequential(
+                nn.Linear(self.f, self.f), nn.SiLU(), nn.Linear(self.f, 3 * self.f)
+            )
+            self.w_layer = nn.Sequential(nn.Linear(20, 3 * self.f, bias=True))
+
+            message_model = message(self.r_cut, self.n, self.shared_ø_layer, self.w_layer, self.f)
+            self.message_models = [message_model] * 3
 
         # Update layers
 
-        self.shared_a = nn.Sequential(
-            nn.Linear(2 * self.f, self.f), nn.SiLU(), nn.Linear(self.f, 3 * self.f)
-        )
+        if not shared:
+            self.a_1 = nn.Sequential(
+                nn.Linear(2 * self.f, self.f), nn.SiLU(), nn.Linear(self.f, 3 * self.f))
+            self.V_1 = nn.Sequential(nn.Linear(self.f, self.f, bias=False))
+            self.U_1 = nn.Sequential(nn.Linear(self.f, self.f, bias=False))
 
-        self.shared_V = nn.Sequential(nn.Linear(self.f, self.f, bias=False))
-        self.shared_U = nn.Sequential(nn.Linear(self.f, self.f, bias=False))
+            self.update_model_1 = update(self.a_1, self.V_1, self.U_1, self.f)
 
-        update_model = update(self.shared_a, self.shared_V, self.shared_U, self.f)
-        self.update_models = [update_model] * 3
+            self.a_2 = nn.Sequential(
+                nn.Linear(2 * self.f, self.f), nn.SiLU(), nn.Linear(self.f, 3 * self.f))
+            self.V_2 = nn.Sequential(nn.Linear(self.f, self.f, bias=False))
+            self.U_2 = nn.Sequential(nn.Linear(self.f, self.f, bias=False))
+
+            self.update_model_2 = update(self.a_2, self.V_2, self.U_2, self.f)
+
+            self.a_3 = nn.Sequential(
+                nn.Linear(2 * self.f, self.f), nn.SiLU(), nn.Linear(self.f, 3 * self.f))
+            self.V_3 = nn.Sequential(nn.Linear(self.f, self.f, bias=False))
+            self.U_3 = nn.Sequential(nn.Linear(self.f, self.f, bias=False))
+
+            self.update_model_3 = update(self.a_3, self.V_3, self.U_3, self.f)
+            
+            self.update_models = [self.update_model_1, self.update_model_2, self.update_model_3]
+        else:    
+            self.shared_a = nn.Sequential(
+                nn.Linear(2 * self.f, self.f), nn.SiLU(), nn.Linear(self.f, 3 * self.f)
+            )
+
+            self.shared_V = nn.Sequential(nn.Linear(self.f, self.f, bias=False))
+            self.shared_U = nn.Sequential(nn.Linear(self.f, self.f, bias=False))
+
+            update_model = update(self.shared_a, self.shared_V, self.shared_U, self.f)
+            self.update_models = [update_model] * 3
 
         # Output layers
         self.output_layers = nn.Sequential(
