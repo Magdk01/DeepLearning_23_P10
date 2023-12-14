@@ -10,7 +10,10 @@ from torch.utils.data import DataLoader
 class QM9Dataset(Dataset):
     # Initialize the dataset object
     def __init__(self, data, target_index):
-        self.dataset = self.standardize(data)
+        if target_index == 0 or target_index == 5:
+            self.dataset = data
+        else:
+            self.dataset = self.standardize(data)
         print(self.dataset)
         self.target_index = target_index
 
