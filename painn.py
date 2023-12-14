@@ -22,8 +22,9 @@ class painn(nn.Module):
         self.shared_ø_layer = nn.Sequential(
             nn.Linear(self.f, self.f), nn.SiLU(), nn.Linear(self.f, 3 * self.f)
         )
+        self.w_layer = nn.Sequential(nn.Linear(20, 3 * self.f, bias=True))
 
-        message_model = message(self.r_cut, self.n, self.shared_ø_layer, self.f)
+        message_model = message(self.r_cut, self.n, self.shared_ø_layer, self.w_layer, self.f)
         self.message_models = [message_model] * 3
 
         # Update layers
@@ -92,13 +93,14 @@ class painn(nn.Module):
 
 
 class message(nn.Module):
-    def __init__(self, r_cut, n, ø_layer, f=128) -> None:
+    def __init__(self, r_cut, n, ø_layer, w_layer,  f=128) -> None:
         super(message, self).__init__()
         self.ø = ø_layer
         self.r_cut = r_cut
         self.n = n
         self.f = f
-        self.internal_w_layer = nn.Sequential(nn.Linear(20, 3 * self.f, bias=True))
+        # self.internal_w_layer = nn.Sequential(nn.Linear(20, 3 * self.f, bias=True))
+        self.internal_w_layer = w_layer
 
     def forward(self, s, r, v, idx_i):
         # s-block
