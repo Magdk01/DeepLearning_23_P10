@@ -2,6 +2,7 @@
 import torch
 from torch.utils.data import Dataset
 from torch_geometric.datasets import QM9
+from torch_geometric.transforms import NormalizeFeatures
 from torch.utils.data import DataLoader
 
 
@@ -9,7 +10,8 @@ from torch.utils.data import DataLoader
 class QM9Dataset(Dataset):
     # Initialize the dataset object
     def __init__(self, data, target_index):
-        self.dataset = data
+        self.dataset = self.standardize(data)
+        print(self.dataset)
         self.target_index = target_index
 
     # Return the length of the dataset
@@ -30,6 +32,9 @@ class QM9Dataset(Dataset):
         # Combine the atomic numbers, coordinates and variable to predict
         return atomic_numbers, coords, y
 
+    def standardize(self, data):
+        data.y = ((data.y.T - torch.mean(data.y, axis=1)) / torch.std(data.y,axis = 1)).T
+        return data        
 
 def my_collate_fn(batch):
     modified_batch = []
@@ -80,3 +85,10 @@ def DataLoad(batch_size=1, shuffle=False, split=[0.8, 0.1, 0.1], target_index=0)
     )
 
     return train_dataloader, test_dataloader, val_dataloader
+
+if __name__ == "__main__":
+        # Create the dataset
+    data = QM9(root="./QM9")
+
+    # Create the dataset object
+    dataset = QM9Dataset(data, 0)
