@@ -10,11 +10,12 @@ from torch.utils.data import DataLoader
 class QM9Dataset(Dataset):
     # Initialize the dataset object
     def __init__(self, data, target_index):
+        if target_index in [2,3,4,6,7,8,9,10,12,13,14,15]:
+            data = self.fix_unit(data)
         if target_index == 0 or target_index == 5:
             self.dataset = data
         else:
             self.dataset = self.standardize(data)
-        print(self.dataset)
         self.target_index = target_index
 
     # Return the length of the dataset
@@ -38,6 +39,9 @@ class QM9Dataset(Dataset):
     def standardize(self, data):
         data.y = ((data.y.T - torch.mean(data.y, axis=1)) / torch.std(data.y,axis = 1)).T
         return data        
+    
+    def fix_unit(self, data):
+        data.y *= 1000
 
 def my_collate_fn(batch):
     modified_batch = []
