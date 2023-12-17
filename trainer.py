@@ -130,7 +130,7 @@ def main():
 
     config = {
         "learning_rate": 0.005,
-        "epochs": 6,
+        "epochs": 16,
         "batch_size": 16,
         "target_label": Target_label,
         "smoothing_factor": 0.5,
@@ -138,14 +138,14 @@ def main():
         "patience": 6,
         "datetime": datetime.now(),
         'weight_decay': 0.07,
-        'swa_start': 4,
-        'shared': False,
+        'swa_start': 11,
+        'shared': True,
     }
 
     if enable_wandb:
         wandb.login()
         wandb.init(
-            project="painn",
+            project="final_results",
             entity="deep_learing_p10",
             name=f"Train run for {Target_label}. Datetime :{config['datetime']}",
             config=config,
