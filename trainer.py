@@ -132,6 +132,7 @@ def main():
         "datetime": datetime.now(),
         'weight_decay': 0.07,
         'swa_start': 1000,
+        'shared': False,
     }
 
     if enable_wandb:
@@ -146,7 +147,7 @@ def main():
     train_loader, test_loader, val_loader = DataLoad(
         batch_size=config["batch_size"], target_index=Target_index
     )
-    model = painn()
+    model = painn(shared=config['shared'])
     loss = torch.nn.MSELoss()
     optimizer = torch.optim.AdamW(model.parameters(), lr=config["learning_rate"], weight_decay=config['weight_decay'])
     EPOCHS = config["epochs"]
