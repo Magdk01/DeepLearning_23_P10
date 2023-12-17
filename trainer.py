@@ -11,6 +11,7 @@ from collections.abc import Iterable
 import argparse
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
+from ray import train
 
 parser = argparse.ArgumentParser(description="Example script with CLI arguments.")
 parser.add_argument(
@@ -21,24 +22,24 @@ parser.add_argument(
 global enable_wandb
 enable_wandb = True
 
+def extract_and_calc_loss(x, model, loss_fn, inner_batch_indexies):
+    atomic_numbers, coords, y = x
+    atomic_numbers = np.array(atomic_numbers)
+    coords = np.array(coords)
+    # y = y[0][0]
+
+    # Make predictions for this batch
+    outputs = model(atomic_numbers, coords, inner_batch_indexies)
+    # assert not np.isnan(outputs.item())
+
+    # Compute the loss and its gradients
+    loss = loss_fn(outputs, y)
+    # Squared error as loss function
+    # loss = (outputs - y) ** 2
+    return loss
+
 
 def run_epoch(loader, model, loss_fn, optimizer, scheduler, config, val_loader=None):
-    def extract_and_calc_loss(x, inner_batch_indexies):
-        atomic_numbers, coords, y = x
-        atomic_numbers = np.array(atomic_numbers)
-        coords = np.array(coords)
-        # y = y[0][0]
-
-        # Make predictions for this batch
-        outputs = model(atomic_numbers, coords, inner_batch_indexies)
-        # assert not np.isnan(outputs.item())
-
-        # Compute the loss and its gradients
-        loss = loss_fn(outputs, y)
-        # Squared error as loss function
-        # loss = (outputs - y) ** 2
-        return loss
-
     smoothed_loss = 0.0
     alpha = config["smoothing_factor"]  # Smoothing factor
 
@@ -51,7 +52,7 @@ def run_epoch(loader, model, loss_fn, optimizer, scheduler, config, val_loader=N
         ]
 
         optimizer.zero_grad()
-        loss = extract_and_calc_loss(concatenated_list, batch_indexies)
+        loss = extract_and_calc_loss(concatenated_list, model, loss_fn, batch_indexies)
 
         loss.backward()
 
@@ -69,7 +70,7 @@ def run_epoch(loader, model, loss_fn, optimizer, scheduler, config, val_loader=N
                     for idx, elements in enumerate(zip(*val_batch))
                 ]
                 val_loss = extract_and_calc_loss(
-                    val_concatenated_list, val_batch_indexies
+                    val_concatenated_list, model, loss_fn, val_batch_indexies
                 )
                 avg_loss_val_list.append(float(val_loss))
 
@@ -79,7 +80,22 @@ def run_epoch(loader, model, loss_fn, optimizer, scheduler, config, val_loader=N
 
             if enable_wandb:
                 wandb.log({"Mean Validation loss": alvl, "i-th_timestep": i})
+    train.report({"loss": alvl})
     return model
+
+def run_test(test_loader, test_model, test_loss_fn):
+    avg_loss_test_list = []
+    for test_i, (test_batch, test_batch_indexies) in enumerate(test_loader):
+        test_concatenated_list = [
+            torch.cat(elements) if not idx == 2 else torch.tensor([elements])
+            for idx, elements in enumerate(zip(*test_batch))
+        ]
+        test_loss = extract_and_calc_loss(
+            test_concatenated_list, test_model, test_loss_fn, test_batch_indexies
+        )
+        avg_loss_test_list.append(float(test_loss))
+
+    return np.mean(avg_loss_test_list)
 
 
 target_dict = {
@@ -95,6 +111,13 @@ target_dict = {
     9: "Enthalpy at 298.15K",
     10: "Free energy at 298.15K",
     11: "Heat capacity at 298.15K",
+    12: "Atomization energy at 0K",
+    13: "Atomization energy at 298.15K",
+    14: "Atomization enthalpy at 298.15K",
+    15: "Atomization free energy at 298.15K",
+    16: "Rotational constant",
+    17: "Rotational constant",
+    18: "Rotational constant",
 }
 
 
@@ -106,53 +129,66 @@ def main():
     print(f"Target label: {Target_label}")
 
     config = {
-        "learning_rate": 0.01,
-        "epochs": 1,
-        "batch_size": 8,
+        "learning_rate": 0.005,
+        "epochs": 16,
+        "batch_size": 16,
         "target_label": Target_label,
-        "smoothing_factor": 0.9,
-        "plateau_decay": 0.5,
-        "patience": 5,
+        "smoothing_factor": 0.5,
+        "plateau_decay": 0.6,
+        "patience": 6,
         "datetime": datetime.now(),
+        'weight_decay': 0.07,
+        'swa_start': 11,
+        'shared': True,
     }
 
     if enable_wandb:
         wandb.login()
         wandb.init(
-            project="painn",
+            project="final_results",
             entity="deep_learing_p10",
-            name=f"Train run for {Target_label}. Datetime :{config['datetime']}",
+            name=f"Train run for {Target_label}. Shared :{config['shared']}. Datetime :{config['datetime']}",
             config=config,
         )
 
     train_loader, test_loader, val_loader = DataLoad(
         batch_size=config["batch_size"], target_index=Target_index
     )
-    model = painn()
+    model = painn(shared=config['shared'])
     loss = torch.nn.MSELoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=config["learning_rate"])
+    optimizer = torch.optim.AdamW(model.parameters(), lr=config["learning_rate"], weight_decay=config['weight_decay'])
     EPOCHS = config["epochs"]
     scheduler = ReduceLROnPlateau(
         optimizer, factor=config["plateau_decay"], patience=config["patience"]
     )
-
+    swa_scheduler = torch.optim.swa_utils.SWALR(optimizer, swa_lr=config["learning_rate"] / 10)
+    swa_model = torch.optim.swa_utils.AveragedModel(model)
     for i in tqdm(range(EPOCHS)):
+        current_scheduler = scheduler if i < config['swa_start'] else swa_scheduler
         trained_model = run_epoch(
             train_loader,
             model,
             loss,
             optimizer,
-            scheduler,
+            current_scheduler,
             config,
             val_loader=val_loader,
         )
+        if i > config['swa_start']:
+            swa_model.update_parameters(model)
+        
         torch.save(
             trained_model,
             f"{Target_label.replace(' ', '_').lower()}_model_{config['datetime']}.pth",
         )
         if enable_wandb:
             wandb.log({"Epoch": i})
-
+    
+    torch.optim.swa_utils.update_bn(train_loader, swa_model)
+    test_loss = run_test(test_loader, swa_model, torch.nn.L1Loss())
+    if enable_wandb:
+        wandb.log({"Test Loss": test_loss})
 
 if __name__ == "__main__":
+    torch.manual_seed(6)
     main()

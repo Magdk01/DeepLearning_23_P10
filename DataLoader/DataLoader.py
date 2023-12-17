@@ -2,6 +2,7 @@
 import torch
 from torch.utils.data import Dataset
 from torch_geometric.datasets import QM9
+from torch_geometric.transforms import NormalizeFeatures
 from torch.utils.data import DataLoader
 
 
@@ -9,7 +10,12 @@ from torch.utils.data import DataLoader
 class QM9Dataset(Dataset):
     # Initialize the dataset object
     def __init__(self, data, target_index):
-        self.dataset = data
+        if target_index in [2,3,4,6,7,8,9,10,12,13,14,15]:
+            data = self.fix_unit(data)
+        if target_index == 0 or target_index == 5:
+            self.dataset = data
+        else:
+            self.dataset = self.standardize(data)
         self.target_index = target_index
 
     # Return the length of the dataset
@@ -24,23 +30,18 @@ class QM9Dataset(Dataset):
         atomic_numbers = batch.z
         coords = batch.pos
 
-        # q = atomic_numbers copied 3 times 
-        q = [num.item() for num in atomic_numbers for _ in range(3)]
-
-        # R_ij = 3x(len(atomic_numbers) * 3))
-        r_ij = torch.zeros((3, len(atomic_numbers) * 3))
-
-        # Get the distance between atoms
-        for i in range(r_ij.shape[0]):
-            for j in range(r_ij.shape[1]):
-                r_ij[i][j] = coords[j//3][i] - coords[j%3][i]
-
         # Variable to predict
         y = batch.y[0][self.target_index]
 
         # Combine the atomic numbers, coordinates and variable to predict
-        return q, r_ij, y
+        return atomic_numbers, coords, y
 
+    def standardize(self, data):
+        data.y = ((data.y.T - torch.mean(data.y, axis=1)) / torch.std(data.y,axis = 1)).T
+        return data        
+    
+    def fix_unit(self, data):
+        data.y *= 1000
 
 def my_collate_fn(batch):
     modified_batch = []
@@ -91,3 +92,10 @@ def DataLoad(batch_size=1, shuffle=False, split=[0.8, 0.1, 0.1], target_index=0)
     )
 
     return train_dataloader, test_dataloader, val_dataloader
+
+if __name__ == "__main__":
+        # Create the dataset
+    data = QM9(root="./QM9")
+
+    # Create the dataset object
+    dataset = QM9Dataset(data, 0)
