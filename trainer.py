@@ -147,7 +147,7 @@ def main():
         wandb.init(
             project="final_results",
             entity="deep_learing_p10",
-            name=f"Train run for {Target_label}. Datetime :{config['datetime']}",
+            name=f"Train run for {Target_label}. Shared :{config['shared']}. Datetime :{config['datetime']}",
             config=config,
         )
 
