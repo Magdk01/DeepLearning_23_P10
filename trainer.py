@@ -111,6 +111,13 @@ target_dict = {
     9: "Enthalpy at 298.15K",
     10: "Free energy at 298.15K",
     11: "Heat capacity at 298.15K",
+    12: "Atomization energy at 0K",
+    13: "Atomization energy at 298.15K",
+    14: "Atomization enthalpy at 298.15K",
+    15: "Atomization free energy at 298.15K",
+    16: "Rotational constant",
+    17: "Rotational constant",
+    18: "Rotational constant",
 }
 
 
