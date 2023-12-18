@@ -10,8 +10,8 @@ from torch.utils.data import DataLoader
 class QM9Dataset(Dataset):
     # Initialize the dataset object
     def __init__(self, data, target_index):
-        if target_index in [2,3,4,6,7,8,9,10,12,13,14,15]:
-            data = self.fix_unit(data)
+        if target_index in [2, 3, 4, 6, 7, 8, 9, 10, 12, 13, 14, 15]:
+            self.dataset = self.fix_unit(data)
         if target_index == 0 or target_index == 5:
             self.dataset = data
         else:
@@ -37,11 +37,13 @@ class QM9Dataset(Dataset):
         return atomic_numbers, coords, y
 
     def standardize(self, data):
-        data.y = ((data.y.T - torch.mean(data.y, axis=1)) / torch.std(data.y,axis = 1)).T
-        return data        
-    
+        data.y = ((data.y.T - torch.mean(data.y, axis=1)) / torch.std(data.y, axis=1)).T
+        return data
+
     def fix_unit(self, data):
         data.y *= 1000
+        return data
+
 
 def my_collate_fn(batch):
     modified_batch = []
@@ -93,8 +95,9 @@ def DataLoad(batch_size=1, shuffle=False, split=[0.8, 0.1, 0.1], target_index=0)
 
     return train_dataloader, test_dataloader, val_dataloader
 
+
 if __name__ == "__main__":
-        # Create the dataset
+    # Create the dataset
     data = QM9(root="./QM9")
 
     # Create the dataset object
