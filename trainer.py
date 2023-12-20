@@ -11,8 +11,6 @@ from collections.abc import Iterable
 import argparse
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
-from ray import train
-
 parser = argparse.ArgumentParser(description="Example script with CLI arguments.")
 parser.add_argument(
     "--target_index", type=int, default=0, help="Index for target label"
@@ -80,7 +78,6 @@ def run_epoch(loader, model, loss_fn, optimizer, scheduler, config, val_loader=N
 
             if enable_wandb:
                 wandb.log({"Mean Validation loss": alvl, "i-th_timestep": i})
-    train.report({"loss": alvl})
     return model
 
 def run_test(test_loader, test_model, test_loss_fn):
