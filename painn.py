@@ -25,7 +25,12 @@ class painn(nn.Module):
             )
             self.w_layer_1 = nn.Sequential(nn.Linear(20, 3 * self.f, bias=True))
             self.message_model_1 = message(
-                self.r_cut, self.n, self.ø_layer_1, self.w_layer_1, self.f
+                self.r_cut,
+                self.n,
+                self.ø_layer_1,
+                self.w_layer_1,
+                self.f,
+                device=self.device,
             )
 
             self.ø_layer_2 = nn.Sequential(
@@ -33,7 +38,12 @@ class painn(nn.Module):
             )
             self.w_layer_2 = nn.Sequential(nn.Linear(20, 3 * self.f, bias=True))
             self.message_model_2 = message(
-                self.r_cut, self.n, self.ø_layer_2, self.w_layer_2, self.f
+                self.r_cut,
+                self.n,
+                self.ø_layer_2,
+                self.w_layer_2,
+                self.f,
+                device=self.device,
             )
 
             self.ø_layer_3 = nn.Sequential(
@@ -41,7 +51,12 @@ class painn(nn.Module):
             )
             self.w_layer_3 = nn.Sequential(nn.Linear(20, 3 * self.f, bias=True))
             self.message_model_3 = message(
-                self.r_cut, self.n, self.ø_layer_3, self.w_layer_3, self.f
+                self.r_cut,
+                self.n,
+                self.ø_layer_3,
+                self.w_layer_3,
+                self.f,
+                device=self.device,
             )
 
             self.message_models = [
@@ -75,7 +90,9 @@ class painn(nn.Module):
             self.V_1 = nn.Sequential(nn.Linear(self.f, self.f, bias=False))
             self.U_1 = nn.Sequential(nn.Linear(self.f, self.f, bias=False))
 
-            self.update_model_1 = update(self.a_1, self.V_1, self.U_1, self.f)
+            self.update_model_1 = update(
+                self.a_1, self.V_1, self.U_1, self.f, device=self.device
+            )
 
             self.a_2 = nn.Sequential(
                 nn.Linear(2 * self.f, self.f), nn.SiLU(), nn.Linear(self.f, 3 * self.f)
@@ -83,7 +100,9 @@ class painn(nn.Module):
             self.V_2 = nn.Sequential(nn.Linear(self.f, self.f, bias=False))
             self.U_2 = nn.Sequential(nn.Linear(self.f, self.f, bias=False))
 
-            self.update_model_2 = update(self.a_2, self.V_2, self.U_2, self.f)
+            self.update_model_2 = update(
+                self.a_2, self.V_2, self.U_2, self.f, device=self.device
+            )
 
             self.a_3 = nn.Sequential(
                 nn.Linear(2 * self.f, self.f), nn.SiLU(), nn.Linear(self.f, 3 * self.f)
@@ -91,7 +110,9 @@ class painn(nn.Module):
             self.V_3 = nn.Sequential(nn.Linear(self.f, self.f, bias=False))
             self.U_3 = nn.Sequential(nn.Linear(self.f, self.f, bias=False))
 
-            self.update_model_3 = update(self.a_3, self.V_3, self.U_3, self.f)
+            self.update_model_3 = update(
+                self.a_3, self.V_3, self.U_3, self.f, device=self.device
+            )
 
             self.update_models = [
                 self.update_model_1,
