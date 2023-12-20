@@ -18,7 +18,7 @@ parser.add_argument(
 
 
 global enable_wandb
-enable_wandb = False
+enable_wandb = True
 
 
 def extract_and_calc_loss(x, model, loss_fn, inner_batch_indexies):
@@ -85,12 +85,14 @@ def run_epoch(
 
             if enable_wandb:
                 wandb.log({"Mean Validation loss": alvl, "i-th_timestep": i})
-    return model
 
 
 def run_test(test_loader, test_model, test_loss_fn, device="cpu"):
     avg_loss_test_list = []
-    for test_i, (test_batch, test_batch_indexies) in enumerate(test_loader):
+    total_iterations = len(test_loader)
+    for test_i, (test_batch, test_batch_indexies) in tqdm(
+        enumerate(test_loader), total=total_iterations
+    ):
         test_concatenated_list = [
             torch.cat(elements).to(device)
             if not idx == 2
@@ -139,7 +141,7 @@ def main():
 
     config = {
         "learning_rate": 0.005,
-        "epochs": 16,
+        "epochs": 1,
         "batch_size": 16,
         "target_label": Target_label,
         "smoothing_factor": 0.5,
@@ -147,7 +149,7 @@ def main():
         "patience": 6,
         "datetime": datetime.now(),
         "weight_decay": 0.07,
-        "swa_start": 11,
+        "swa_start": 100,
         "shared": True,
     }
 
@@ -181,7 +183,7 @@ def main():
     swa_model = torch.optim.swa_utils.AveragedModel(model)
     for i in tqdm(range(EPOCHS)):
         current_scheduler = scheduler if i < config["swa_start"] else swa_scheduler
-        trained_model = run_epoch(
+        run_epoch(
             train_loader,
             model,
             loss,
@@ -195,7 +197,7 @@ def main():
             swa_model.update_parameters(model)
 
         torch.save(
-            trained_model,
+            model,
             f"{Target_label.replace(' ', '_').lower()}_model_{config['datetime']}.pth",
         )
         if enable_wandb:
