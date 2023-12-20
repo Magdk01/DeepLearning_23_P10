@@ -17,6 +17,7 @@ class QM9Dataset(Dataset):
         else:
             self.dataset = self.standardize(data)
         self.target_index = target_index
+        self.device = "cuda:0"
 
     # Return the length of the dataset
     def __len__(self):
@@ -27,11 +28,11 @@ class QM9Dataset(Dataset):
         batch = self.dataset[index]
 
         # Get the atomic numbers and coordinates
-        atomic_numbers = batch.z
-        coords = batch.pos
+        atomic_numbers = batch.z.to(self.device)
+        coords = batch.pos.to(self.device)
 
         # Variable to predict
-        y = batch.y[0][self.target_index]
+        y = batch.y[0][self.target_index].to(self.device)
 
         # Combine the atomic numbers, coordinates and variable to predict
         return atomic_numbers, coords, y
@@ -50,7 +51,7 @@ def my_collate_fn(batch):
     indexes = []
 
     for index, data in enumerate(batch):
-        data = list(data)
+        data = [d.to("cuda:0") for d in data]
         num_atoms = data[1].shape[0]  # Get the number of atoms
         indexes += [
             int(index)
@@ -60,7 +61,7 @@ def my_collate_fn(batch):
         modified_batch.append(data)
 
     # Return the batch data and the indexes
-    return modified_batch, torch.tensor(indexes)
+    return modified_batch, torch.tensor(indexes).to("cuda:0")
 
 
 # Function to create the dataset
