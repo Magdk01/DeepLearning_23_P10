@@ -10,7 +10,7 @@ def hadamard(m1, m2):
 
 
 class painn(nn.Module):
-    def __init__(self, r_cut=2, n=20, f=128, shared =True) -> None:
+    def __init__(self, r_cut=2, n=20, f=128, shared=True) -> None:
         super(painn, self).__init__()
         self.device = "cuda:0"
         self.r_cut = r_cut
@@ -20,58 +20,80 @@ class painn(nn.Module):
         # Message layers
 
         if not shared:
-            self.ø_layer_1 =  nn.Sequential(
-                nn.Linear(self.f, self.f), nn.SiLU(), nn.Linear(self.f, 3 * self.f))
+            self.ø_layer_1 = nn.Sequential(
+                nn.Linear(self.f, self.f), nn.SiLU(), nn.Linear(self.f, 3 * self.f)
+            )
             self.w_layer_1 = nn.Sequential(nn.Linear(20, 3 * self.f, bias=True))
-            self.message_model_1 = message(self.r_cut, self.n, self.ø_layer_1, self.w_layer_1, self.f)
-        
-            self.ø_layer_2 =  nn.Sequential(
-                nn.Linear(self.f, self.f), nn.SiLU(), nn.Linear(self.f, 3 * self.f))
-            self.w_layer_2 = nn.Sequential(nn.Linear(20, 3 * self.f, bias=True))
-            self.message_model_2 = message(self.r_cut, self.n, self.ø_layer_2, self.w_layer_2, self.f)
+            self.message_model_1 = message(
+                self.r_cut, self.n, self.ø_layer_1, self.w_layer_1, self.f
+            )
 
-            self.ø_layer_3 =  nn.Sequential(
-                nn.Linear(self.f, self.f), nn.SiLU(), nn.Linear(self.f, 3 * self.f))
+            self.ø_layer_2 = nn.Sequential(
+                nn.Linear(self.f, self.f), nn.SiLU(), nn.Linear(self.f, 3 * self.f)
+            )
+            self.w_layer_2 = nn.Sequential(nn.Linear(20, 3 * self.f, bias=True))
+            self.message_model_2 = message(
+                self.r_cut, self.n, self.ø_layer_2, self.w_layer_2, self.f
+            )
+
+            self.ø_layer_3 = nn.Sequential(
+                nn.Linear(self.f, self.f), nn.SiLU(), nn.Linear(self.f, 3 * self.f)
+            )
             self.w_layer_3 = nn.Sequential(nn.Linear(20, 3 * self.f, bias=True))
-            self.message_model_3 = message(self.r_cut, self.n, self.ø_layer_3, self.w_layer_3, self.f)
-            
-            self.message_models = [self.message_model_1, self.message_model_2, self.message_model_3]
-            
+            self.message_model_3 = message(
+                self.r_cut, self.n, self.ø_layer_3, self.w_layer_3, self.f
+            )
+
+            self.message_models = [
+                self.message_model_1,
+                self.message_model_2,
+                self.message_model_3,
+            ]
+
         else:
             self.shared_ø_layer = nn.Sequential(
                 nn.Linear(self.f, self.f), nn.SiLU(), nn.Linear(self.f, 3 * self.f)
             )
             self.w_layer = nn.Sequential(nn.Linear(20, 3 * self.f, bias=True))
 
-            message_model = message(self.r_cut, self.n, self.shared_ø_layer, self.w_layer, self.f)
+            message_model = message(
+                self.r_cut, self.n, self.shared_ø_layer, self.w_layer, self.f
+            )
             self.message_models = [message_model] * 3
 
         # Update layers
 
         if not shared:
             self.a_1 = nn.Sequential(
-                nn.Linear(2 * self.f, self.f), nn.SiLU(), nn.Linear(self.f, 3 * self.f))
+                nn.Linear(2 * self.f, self.f), nn.SiLU(), nn.Linear(self.f, 3 * self.f)
+            )
             self.V_1 = nn.Sequential(nn.Linear(self.f, self.f, bias=False))
             self.U_1 = nn.Sequential(nn.Linear(self.f, self.f, bias=False))
 
             self.update_model_1 = update(self.a_1, self.V_1, self.U_1, self.f)
 
             self.a_2 = nn.Sequential(
-                nn.Linear(2 * self.f, self.f), nn.SiLU(), nn.Linear(self.f, 3 * self.f))
+                nn.Linear(2 * self.f, self.f), nn.SiLU(), nn.Linear(self.f, 3 * self.f)
+            )
             self.V_2 = nn.Sequential(nn.Linear(self.f, self.f, bias=False))
             self.U_2 = nn.Sequential(nn.Linear(self.f, self.f, bias=False))
 
             self.update_model_2 = update(self.a_2, self.V_2, self.U_2, self.f)
 
             self.a_3 = nn.Sequential(
-                nn.Linear(2 * self.f, self.f), nn.SiLU(), nn.Linear(self.f, 3 * self.f))
+                nn.Linear(2 * self.f, self.f), nn.SiLU(), nn.Linear(self.f, 3 * self.f)
+            )
             self.V_3 = nn.Sequential(nn.Linear(self.f, self.f, bias=False))
             self.U_3 = nn.Sequential(nn.Linear(self.f, self.f, bias=False))
 
             self.update_model_3 = update(self.a_3, self.V_3, self.U_3, self.f)
-            
-            self.update_models = [self.update_model_1, self.update_model_2, self.update_model_3]
-        else:    
+
+            self.update_models = [
+                self.update_model_1,
+                self.update_model_2,
+                self.update_model_3,
+            ]
+        else:
             self.shared_a = nn.Sequential(
                 nn.Linear(2 * self.f, self.f), nn.SiLU(), nn.Linear(self.f, 3 * self.f)
             )
@@ -106,7 +128,9 @@ class painn(nn.Module):
         self.v = torch.zeros((self.s.shape[0], 3, self.f))
 
         for idx in range(3):
-            v, s = self.v.detach().clone(), self.s.detach().clone()
+            v, s = self.v.detach().clone().to(self.device), self.s.detach().clone().to(
+                self.device
+            )
 
             self.v, self.s = self.message_models[idx](
                 self.s[self.idx_i], self.r, v[self.idx_i], self.idx_i
@@ -125,25 +149,26 @@ class painn(nn.Module):
         out = self.output_layers(self.s)
         # Create a tensor for sums
         num_items = graph_indicies[-1] + 1  # Assuming indexes start from 0
-        sums = torch.zeros(num_items, dtype=torch.float32)
+        sums = torch.zeros(num_items, dtype=torch.float32).to(self.device)
         indicies = torch.tensor(graph_indicies)
         # Add the data to the sums tensor at the specified indexes
         out = torch.squeeze(out)
-        out = torch.sum(out, dim=-1)
+        out = torch.sum(out, dim=-1).to(self.device)
         sums.index_add_(0, indicies, out)
 
         return sums
 
 
 class message(nn.Module):
-    def __init__(self, r_cut, n, ø_layer, w_layer,  f=128) -> None:
+    def __init__(self, r_cut, n, ø_layer, w_layer, f=128) -> None:
         super(message, self).__init__()
-        self.ø = ø_layer
+        self.device = "cuda:0"
+        self.ø = ø_layer.to(self.device)
         self.r_cut = r_cut
         self.n = n
         self.f = f
         # self.internal_w_layer = nn.Sequential(nn.Linear(20, 3 * self.f, bias=True))
-        self.internal_w_layer = w_layer
+        self.internal_w_layer = w_layer.to(self.device)
 
     def forward(self, s, r, v, idx_i):
         # s-block
@@ -152,17 +177,17 @@ class message(nn.Module):
         assert ø_out.size(2) == 3 * self.f
 
         # left r-block
-        r = self.__rbf(r, self.n)
-        r = self.__fcut(r, self.r_cut)
-        w = self.internal_w_layer(r)
+        r = self.__rbf(r, self.n).to(self.device)
+        r = self.__fcut(r, self.r_cut).to(self.device)
+        w = self.internal_w_layer(r).to(self.device)
         # w = self.__fcut(r, self.r_cut)
 
         assert w.size(2) == 3 * self.f
 
-        split = hadamard(w, ø_out)
+        split = hadamard(w, ø_out).to(self.device)
         split_tensor = torch.split(split, self.f, dim=2)
 
-        out_s = torch.zeros(len(set(idx_i)), 1, self.f)
+        out_s = torch.zeros(len(set(idx_i)), 1, self.f).to(self.device)
         for idx, i in enumerate(idx_i):
             out_s[i] += split_tensor[1][idx]
 
@@ -175,15 +200,15 @@ class message(nn.Module):
         v = hadamard(split_tensor[0], v)
         v = torch.add(org_r, v)
 
-        out_v = torch.zeros(len(set(idx_i)), 3, self.f)
+        out_v = torch.zeros(len(set(idx_i)), 3, self.f).to(self.device)
         for idx, i in enumerate(idx_i):
             out_v[i] += v[idx]
 
         return out_v, out_s
 
     def __rbf(self, input, n):
-        n_values = torch.arange(1, n + 1).float()  # Shape: (n,)
-        r_norms = torch.norm(input, dim=1, keepdim=True)  # Shape: (12,)
+        n_values = torch.arange(1, n + 1).float().to(self.device)  # Shape: (n,)
+        r_norms = torch.norm(input, dim=1, keepdim=True).to(self.device)  # Shape: (12,)
         # Broadcasting r_norms to (12, n) and n_values to (12, n)
         r_norms = r_norms.unsqueeze(2).expand(-1, -1, n)
         n_values = n_values.unsqueeze(0).expand(r_norms.shape[0], 1, -1)
