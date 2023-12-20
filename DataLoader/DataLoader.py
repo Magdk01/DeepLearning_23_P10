@@ -5,11 +5,13 @@ from torch_geometric.datasets import QM9
 from torch_geometric.transforms import NormalizeFeatures
 from torch.utils.data import DataLoader
 
+glob_device = "cpu"
+
 
 # Dataset class
 class QM9Dataset(Dataset):
     # Initialize the dataset object
-    def __init__(self, data, target_index):
+    def __init__(self, data, target_index, device):
         if target_index in [2, 3, 4, 6, 7, 8, 9, 10, 12, 13, 14, 15]:
             self.dataset = self.fix_unit(data)
         if target_index == 0 or target_index == 5:
@@ -17,7 +19,10 @@ class QM9Dataset(Dataset):
         else:
             self.dataset = self.standardize(data)
         self.target_index = target_index
-        self.device = "cuda:0"
+
+        self.device = device
+        global glob_device
+        glob_device = self.device
 
     # Return the length of the dataset
     def __len__(self):
@@ -51,7 +56,7 @@ def my_collate_fn(batch):
     indexes = []
 
     for index, data in enumerate(batch):
-        data = [d.to("cuda:0") for d in data]
+        data = [d.to(glob_device) for d in data]
         num_atoms = data[1].shape[0]  # Get the number of atoms
         indexes += [
             int(index)
@@ -61,16 +66,18 @@ def my_collate_fn(batch):
         modified_batch.append(data)
 
     # Return the batch data and the indexes
-    return modified_batch, torch.tensor(indexes).to("cuda:0")
+    return modified_batch, torch.tensor(indexes).to(glob_device)
 
 
 # Function to create the dataset
-def DataLoad(batch_size=1, shuffle=False, split=[0.8, 0.1, 0.1], target_index=0):
+def DataLoad(
+    batch_size=1, shuffle=False, split=[0.8, 0.1, 0.1], target_index=0, device="cpu"
+):
     # Create the dataset
     data = QM9(root="./QM9")
 
     # Create the dataset object
-    dataset = QM9Dataset(data, target_index)
+    dataset = QM9Dataset(data, target_index, device=device)
 
     total_size = len(dataset) - 64  # Reserve 64 for the validation set
     train_size = int(split[0] * total_size)
@@ -85,7 +92,10 @@ def DataLoad(batch_size=1, shuffle=False, split=[0.8, 0.1, 0.1], target_index=0)
 
     # Create the train and test dataloaders
     train_dataloader = DataLoader(
-        train_dataset, batch_size=batch_size, shuffle=shuffle, collate_fn=my_collate_fn
+        train_dataset,
+        batch_size=batch_size,
+        shuffle=shuffle,
+        collate_fn=my_collate_fn,
     )
     test_dataloader = DataLoader(
         test_dataset, batch_size=batch_size, shuffle=shuffle, collate_fn=my_collate_fn
