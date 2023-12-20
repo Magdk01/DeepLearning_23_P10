@@ -38,7 +38,9 @@ def extract_and_calc_loss(x, model, loss_fn, inner_batch_indexies):
     return loss
 
 
-def run_epoch(loader, model, loss_fn, optimizer, scheduler, config, val_loader=None):
+def run_epoch(
+    loader, model, loss_fn, optimizer, scheduler, config, val_loader=None, device="cpu"
+):
     smoothed_loss = 0.0
     alpha = config["smoothing_factor"]  # Smoothing factor
 
@@ -46,9 +48,9 @@ def run_epoch(loader, model, loss_fn, optimizer, scheduler, config, val_loader=N
     for i, (batch, batch_indexies) in tqdm(enumerate(loader), total=total_iterations):
         batch_save = batch
         concatenated_list = [
-            torch.cat(elements).to("cuda:0")
+            torch.cat(elements).to(device)
             if not idx == 2
-            else torch.tensor([elements]).to("cuda:0")
+            else torch.tensor([elements]).to(device)
             for idx, elements in enumerate(zip(*batch))
         ]
 
@@ -67,7 +69,9 @@ def run_epoch(loader, model, loss_fn, optimizer, scheduler, config, val_loader=N
             avg_loss_val_list = []
             for val_i, (val_batch, val_batch_indexies) in enumerate(val_loader):
                 val_concatenated_list = [
-                    torch.cat(elements).to("cuda:0") if not idx == 2 else torch.tensor([elements]).to("cuda:0")
+                    torch.cat(elements).to(device)
+                    if not idx == 2
+                    else torch.tensor([elements]).to(device)
                     for idx, elements in enumerate(zip(*val_batch))
                 ]
                 val_loss = extract_and_calc_loss(
@@ -84,11 +88,13 @@ def run_epoch(loader, model, loss_fn, optimizer, scheduler, config, val_loader=N
     return model
 
 
-def run_test(test_loader, test_model, test_loss_fn):
+def run_test(test_loader, test_model, test_loss_fn, device="cpu"):
     avg_loss_test_list = []
     for test_i, (test_batch, test_batch_indexies) in enumerate(test_loader):
         test_concatenated_list = [
-            torch.cat(elements) if not idx == 2 else torch.tensor([elements])
+            torch.cat(elements).to(device)
+            if not idx == 2
+            else torch.tensor([elements]).to(device)
             for idx, elements in enumerate(zip(*test_batch))
         ]
         test_loss = extract_and_calc_loss(
@@ -123,7 +129,8 @@ target_dict = {
 
 
 def main():
-    device = "cuda:0"
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # device = "cpu"
     args = parser.parse_args()
     Target_index = args.target_index
     # Target_index = 0
@@ -154,9 +161,9 @@ def main():
         )
 
     train_loader, test_loader, val_loader = DataLoad(
-        batch_size=config["batch_size"], target_index=Target_index
+        batch_size=config["batch_size"], target_index=Target_index, device=device
     )
-    model = painn(shared=config["shared"])
+    model = painn(shared=config["shared"], device=device)
     model.to(device)
     loss = torch.nn.MSELoss()
     optimizer = torch.optim.AdamW(
@@ -182,6 +189,7 @@ def main():
             current_scheduler,
             config,
             val_loader=val_loader,
+            device=device,
         )
         if i > config["swa_start"]:
             swa_model.update_parameters(model)

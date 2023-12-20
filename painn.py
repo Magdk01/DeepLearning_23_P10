@@ -10,9 +10,9 @@ def hadamard(m1, m2):
 
 
 class painn(nn.Module):
-    def __init__(self, r_cut=2, n=20, f=128, shared=True) -> None:
+    def __init__(self, r_cut=2, n=20, f=128, shared=True, device="cpu") -> None:
         super(painn, self).__init__()
-        self.device = "cuda:0"
+        self.device = device
         self.r_cut = r_cut
         self.n = n
         self.f = f
@@ -57,7 +57,12 @@ class painn(nn.Module):
             self.w_layer = nn.Sequential(nn.Linear(20, 3 * self.f, bias=True))
 
             message_model = message(
-                self.r_cut, self.n, self.shared_ø_layer, self.w_layer, self.f
+                self.r_cut,
+                self.n,
+                self.shared_ø_layer,
+                self.w_layer,
+                self.f,
+                device=self.device,
             )
             self.message_models = [message_model] * 3
 
@@ -101,7 +106,9 @@ class painn(nn.Module):
             self.shared_V = nn.Sequential(nn.Linear(self.f, self.f, bias=False))
             self.shared_U = nn.Sequential(nn.Linear(self.f, self.f, bias=False))
 
-            update_model = update(self.shared_a, self.shared_V, self.shared_U, self.f)
+            update_model = update(
+                self.shared_a, self.shared_V, self.shared_U, self.f, device=self.device
+            )
             self.update_models = [update_model] * 3
 
         # Output layers
@@ -160,9 +167,9 @@ class painn(nn.Module):
 
 
 class message(nn.Module):
-    def __init__(self, r_cut, n, ø_layer, w_layer, f=128) -> None:
+    def __init__(self, r_cut, n, ø_layer, w_layer, f=128, device="cpu") -> None:
         super(message, self).__init__()
-        self.device = "cuda:0"
+        self.device = device
         self.ø = ø_layer.to(self.device)
         self.r_cut = r_cut
         self.n = n
@@ -225,12 +232,13 @@ class message(nn.Module):
 
 
 class update(nn.Module):
-    def __init__(self, a, V, U, f=128) -> None:
+    def __init__(self, a, V, U, f=128, device="cpu") -> None:
         super(update, self).__init__()
         self.a = a
         self.V = V
         self.U = U
         self.f = f
+        self.device = device
 
     def forward(self, s, v):
         # top v-block
